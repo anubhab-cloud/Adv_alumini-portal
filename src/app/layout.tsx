@@ -29,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${outfit.variable} ${inter.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
-        <Script id="strip-extension-tags" strategy="beforeInteractive">
+        <Script id="strip-extension-tags" strategy="beforeInteractive" suppressHydrationWarning>
           {`
             (function() {
               const observer = new MutationObserver((mutations) => {
