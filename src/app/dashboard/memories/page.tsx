@@ -359,7 +359,7 @@ export default function MemoryWall() {
                         {comment.userName}
                       </span>
                       <span className="text-[9px] text-zinc-500 font-light">
-                        {new Date(comment.createdAt).toLocaleDateString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                        {new Date(comment.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
                       </span>
                     </div>
                     <p className="text-zinc-400 text-xs mt-1.5 font-light leading-relaxed">
