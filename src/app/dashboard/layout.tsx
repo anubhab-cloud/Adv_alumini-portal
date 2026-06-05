@@ -14,6 +14,7 @@ export default function DashboardLayout({
   const { user, loading } = useAuth();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
 
   // Auth Protection Guard
   useEffect(() => {
@@ -47,9 +48,9 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col md:flex-row relative">
-      {/* Sidebar for Desktop & Drawer for Mobile */}
-      <div className={`md:block ${sidebarOpen ? "block" : "hidden"} shrink-0`}>
-        <Sidebar isOpen={true} setIsOpen={() => {}} />
+      {/* Sidebar for Desktop */}
+      <div className="hidden md:block shrink-0">
+        <Sidebar isOpen={sidebarExpanded} setIsOpen={setSidebarExpanded} />
       </div>
 
       {/* Mobile Drawer Overlay */}
