@@ -3,452 +3,637 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { mockDb, MockEvent } from "@/lib/mockDb";
-import { 
-  Calendar, 
-  Users, 
-  ImageIcon, 
-  Edit3, 
-  CheckCircle, 
-  ExternalLink,
+import {
   MapPin,
-  Clock,
+  Calendar,
+  Users,
+  ImageIcon,
   Save,
-  Plus,
-  AtSign
+  AtSign,
+  X,
+  ChevronRight,
+  Ticket,
+  Search,
 } from "lucide-react";
 import Link from "next/link";
 
+/* ── Countdown unit ── */
+function CdUnit({ value, label }: { value: number; label: string }) {
+  return (
+    <div
+      style={{
+        background: "var(--surface2)",
+        border: "1px solid var(--border)",
+        borderRadius: 13,
+        padding: "13px 16px",
+        textAlign: "center",
+        minWidth: 70,
+        transition: "border-color 0.2s",
+      }}
+    >
+      <span
+        style={{
+          fontFamily: "var(--font-dm-serif, 'DM Serif Display')",
+          fontSize: 30,
+          color: "var(--gold2)",
+          lineHeight: 1,
+          display: "block",
+        }}
+      >
+        {String(value).padStart(2, "0")}
+      </span>
+      <span
+        style={{
+          fontSize: 10,
+          color: "var(--muted)",
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          marginTop: 3,
+          display: "block",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/* ── Stat card ── */
+function StatCard({
+  icon,
+  value,
+  label,
+  delta,
+  accent,
+}: {
+  icon: string;
+  value: number | string;
+  label: string;
+  delta: string;
+  accent: "gold" | "blue" | "grey";
+}) {
+  const iconBg = {
+    gold: "rgba(212,168,67,0.12)",
+    blue: "rgba(74,127,193,0.12)",
+    grey: "rgba(138,154,181,0.12)",
+  }[accent];
+  const deltaColor = accent === "blue" ? "var(--blue2)" : "var(--gold2)";
+  const deltaBg =
+    accent === "blue" ? "rgba(74,127,193,0.1)" : "rgba(212,168,67,0.1)";
+
+  return (
+    <div
+      className="glass-card"
+      style={{ borderRadius: 16, padding: 20, textAlign: "center", cursor: "default" }}
+    >
+      <div
+        style={{
+          width: 46,
+          height: 46,
+          borderRadius: 13,
+          margin: "0 auto 12px",
+          display: "grid",
+          placeItems: "center",
+          fontSize: 20,
+          background: iconBg,
+        }}
+      >
+        {icon}
+      </div>
+      <p
+        style={{
+          fontFamily: "var(--font-dm-serif, 'DM Serif Display')",
+          fontSize: 38,
+          lineHeight: 1,
+          color: "var(--grey2)",
+        }}
+      >
+        {value}
+      </p>
+      <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{label}</p>
+      <span
+        style={{
+          display: "inline-block",
+          fontSize: 11,
+          fontWeight: 600,
+          marginTop: 8,
+          padding: "2px 8px",
+          borderRadius: 6,
+          color: deltaColor,
+          background: deltaBg,
+        }}
+      >
+        {delta}
+      </span>
+    </div>
+  );
+}
+
+/* ── Quick action card ── */
+function ActionCard({
+  icon,
+  title,
+  desc,
+  href,
+  accent,
+}: {
+  icon: string;
+  title: string;
+  desc: string;
+  href: string;
+  accent: "gold" | "blue" | "grey";
+}) {
+  const iconBg = {
+    gold: "rgba(212,168,67,0.12)",
+    blue: "rgba(74,127,193,0.12)",
+    grey: "rgba(138,154,181,0.1)",
+  }[accent];
+
+  return (
+    <Link href={href} style={{ textDecoration: "none" }}>
+      <div
+        className="glass-card"
+        style={{ borderRadius: 16, padding: 22, cursor: "pointer", position: "relative", overflow: "hidden" }}
+      >
+        <div
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: 13,
+            display: "grid",
+            placeItems: "center",
+            fontSize: 20,
+            marginBottom: 14,
+            background: iconBg,
+          }}
+        >
+          {icon}
+        </div>
+        <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 6, color: "var(--text)" }}>{title}</p>
+        <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.55 }}>{desc}</p>
+        <div
+          style={{
+            position: "absolute",
+            top: 22,
+            right: 22,
+            color: "var(--gold2)",
+          }}
+        >
+          <ChevronRight size={15} />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════ */
 export default function DashboardHome() {
   const { user, updateProfile } = useAuth();
   const [nextEvent, setNextEvent] = useState<MockEvent | null>(null);
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  
-  // Profile form state
-  const [company, setCompany] = useState(user?.company || "");
-  const [title, setTitle] = useState(user?.title || "");
-  const [bio, setBio] = useState(user?.bio || "");
-  const [skills, setSkills] = useState(user?.skills?.join(", ") || "");
-  const [linkedinUrl, setLinkedinUrl] = useState(user?.linkedinUrl || "");
-  const [githubUrl, setGithubUrl] = useState(user?.githubUrl || "");
-  const [instagramUrl, setInstagramUrl] = useState(user?.instagramUrl || "");
-  const [facebookUrl, setFacebookUrl] = useState(user?.facebookUrl || "");
-  const [twitterUrl, setTwitterUrl] = useState(user?.twitterUrl || "");
   const [profileSuccess, setProfileSuccess] = useState(false);
 
-  // Load next upcoming event
+  /* Profile form state */
+  const [company,      setCompany]      = useState(user?.company      || "");
+  const [title,        setTitle]        = useState(user?.title        || "");
+  const [bio,          setBio]          = useState(user?.bio          || "");
+  const [skills,       setSkills]       = useState(user?.skills?.join(", ") || "");
+  const [linkedinUrl,  setLinkedinUrl]  = useState(user?.linkedinUrl  || "");
+  const [githubUrl,    setGithubUrl]    = useState(user?.githubUrl    || "");
+  const [instagramUrl, setInstagramUrl] = useState(user?.instagramUrl || "");
+  const [facebookUrl,  setFacebookUrl]  = useState(user?.facebookUrl  || "");
+  const [twitterUrl,   setTwitterUrl]   = useState(user?.twitterUrl   || "");
+
+  /* Next event */
   useEffect(() => {
-    const events = mockDb.getEvents();
-    const futureEvents = events
-      .filter(e => new Date(e.date).getTime() > Date.now())
+    const future = mockDb
+      .getEvents()
+      .filter((e) => new Date(e.date).getTime() > Date.now())
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    if (futureEvents.length > 0) {
-      setNextEvent(futureEvents[0]);
-    }
+    if (future.length > 0) setNextEvent(future[0]);
   }, []);
 
-  // Countdown timer hook
+  /* Live countdown */
   useEffect(() => {
     if (!nextEvent) return;
-
-    const timer = setInterval(() => {
-      const targetTime = new Date(nextEvent.date).getTime();
-      const difference = targetTime - Date.now();
-
-      if (difference <= 0) {
-        setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        clearInterval(timer);
-      } else {
-        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((difference % (1000 * 60)) / 1000);
-        setCountdown({ days, hours, minutes, seconds });
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
+    const tick = () => {
+      const diff = new Date(nextEvent.date).getTime() - Date.now();
+      if (diff <= 0) return setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      setCountdown({
+        days:    Math.floor(diff / 86400000),
+        hours:   Math.floor((diff % 86400000) / 3600000),
+        minutes: Math.floor((diff % 3600000)  / 60000),
+        seconds: Math.floor((diff % 60000)    / 1000),
+      });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, [nextEvent]);
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const skillsArray = skills
-      .split(",")
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-
+    const skillsArray = skills.split(",").map((s) => s.trim()).filter(Boolean);
     try {
-      await updateProfile({
-        company,
-        title,
-        bio,
-        skills: skillsArray,
-        linkedinUrl,
-        githubUrl,
-        instagramUrl,
-        facebookUrl,
-        twitterUrl,
-      });
+      await updateProfile({ company, title, bio, skills: skillsArray, linkedinUrl, githubUrl, instagramUrl, facebookUrl, twitterUrl });
       setProfileSuccess(true);
       setTimeout(() => setProfileSuccess(false), 3000);
       setIsEditingProfile(false);
-    } catch (error) {
-      console.error("Failed to update profile", error);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const dashboardStats = [
-    { label: "Network Members", value: mockDb.getUsers().length, icon: Users, color: "text-blue-400 bg-blue-500/10" },
-    { label: "Community Events", value: mockDb.getEvents().length, icon: Calendar, color: "text-violet-400 bg-violet-500/10" },
-    { label: "Shared Memories", value: mockDb.getMemories().length, icon: ImageIcon, color: "text-pink-400 bg-pink-500/10" },
-  ];
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning ☀️";
+    if (h < 17) return "Good afternoon 👋";
+    return "Good evening 🌙";
+  })();
+
+  const memberCount = mockDb.getUsers().length;
+  const eventCount  = mockDb.getEvents().length;
+  const memoryCount = mockDb.getMemories().length;
+
+  const inputCls: React.CSSProperties = {
+    width: "100%",
+    background: "var(--surface2)",
+    border: "1px solid var(--border)",
+    borderRadius: 11,
+    padding: "10px 14px",
+    color: "var(--text)",
+    fontSize: 13,
+    outline: "none",
+    fontFamily: "var(--font-dm-sans, 'DM Sans')",
+  };
+
+  const labelCls: React.CSSProperties = {
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: "0.1em",
+    textTransform: "uppercase",
+    color: "var(--muted)",
+    display: "block",
+    marginBottom: 5,
+  };
 
   return (
-    <div className="space-y-6 text-left">
-      {/* Welcome header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 glass-card rounded-2xl">
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+
+      {/* ── Top bar: welcome + CTA ── */}
+      <div
+        className="fade-up"
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold font-outfit text-white leading-tight">
-            Welcome back, <span className="text-gradient">{user?.name}</span>!
+          <p style={{ fontSize: 13, color: "var(--muted)", letterSpacing: "0.04em", marginBottom: 4 }}>
+            {greeting}
+          </p>
+          <h1
+            style={{
+              fontFamily: "var(--font-dm-serif, 'DM Serif Display')",
+              fontSize: "clamp(26px, 5vw, 40px)",
+              lineHeight: 1.1,
+              background: "linear-gradient(120deg, var(--text) 40%, var(--gold2) 80%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            Welcome back, {user?.name}
           </h1>
-          <p className="text-zinc-400 text-sm font-light mt-1">
-            {user?.role === "admin" ? (
-              <span className="text-rose-400 font-semibold uppercase tracking-wider text-xs">
-                System Administrator
-              </span>
-            ) : (
-              <span>
-                Batch {user?.batch || "N/A"} • {user?.branch || "Alumni Portal"}
-              </span>
-            )}
+          <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>
+            {user?.role === "admin"
+              ? "System Administrator"
+              : `Batch ${user?.batch || "N/A"} · ${user?.branch || "Alumni Portal"}`}
           </p>
         </div>
-        <button
-          onClick={() => setIsEditingProfile(!isEditingProfile)}
-          className="flex items-center justify-center gap-2 bg-primary hover:bg-violet-700 text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition-all shadow-md hover:shadow-violet-500/10 w-fit shrink-0"
-        >
-          <Edit3 className="h-4 w-4" />
-          Edit Professional Card
-        </button>
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+          {/* Notification bell */}
+          <button
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 11,
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              display: "grid",
+              placeItems: "center",
+              cursor: "pointer",
+              color: "var(--muted)",
+              position: "relative",
+            }}
+            aria-label="Notifications"
+          >
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "var(--gold2)",
+                position: "absolute",
+                top: 8,
+                right: 8,
+                border: "2px solid var(--surface)",
+              }}
+              className="animate-pulse-dot"
+            />
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
+            </svg>
+          </button>
+
+          {/* Edit profile CTA */}
+          <button
+            onClick={() => setIsEditingProfile(!isEditingProfile)}
+            style={{
+              background: "linear-gradient(135deg, var(--gold2), var(--gold))",
+              color: "#0d1117",
+              fontSize: 13,
+              fontWeight: 700,
+              padding: "10px 20px",
+              borderRadius: 11,
+              border: "none",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              boxShadow: "0 4px 16px rgba(212,168,67,0.25)",
+              whiteSpace: "nowrap",
+              fontFamily: "var(--font-dm-sans, 'DM Sans')",
+            }}
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            Edit Profile Card
+          </button>
+        </div>
       </div>
 
-      {/* Edit Profile Panel */}
+      {/* ── Profile editor panel ── */}
       {isEditingProfile && (
-        <div className="glass-card rounded-2xl p-6 border border-violet-500/30 shadow-lg animate-in slide-in-from-top-4 duration-300">
-          <div className="flex items-center justify-between pb-4 mb-4 border-b border-zinc-800">
-            <h3 className="text-lg font-bold font-outfit text-white">Edit Professional Profile</h3>
+        <div
+          className="glass-card fade-up"
+          style={{ borderRadius: 18, padding: 24, border: "1px solid rgba(212,168,67,0.25)" }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 20,
+              paddingBottom: 16,
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            <h3 style={{ fontFamily: "var(--font-dm-serif, 'DM Serif Display')", fontSize: 18, color: "var(--text)" }}>
+              Edit Professional Profile
+            </h3>
             <button
               onClick={() => setIsEditingProfile(false)}
-              className="text-zinc-400 hover:text-white text-xs font-semibold"
+              style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 4 }}
             >
-              Cancel
+              <X size={18} />
             </button>
           </div>
 
-          <form onSubmit={handleProfileSave} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">
-                Current Company
-              </label>
-              <input
-                type="text"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                placeholder="Google, Tesla, etc."
-                className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
-              />
-            </div>
-            
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">
-                Job Title
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Software Engineer, Product Manager, etc."
-                className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
-              />
-            </div>
-
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">
-                Professional Bio
-              </label>
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Briefly describe your career focus, experiences, and mentorship preferences..."
-                rows={3}
-                className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light resize-none"
-              />
-            </div>
-
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">
-                Key Skills (comma separated)
-              </label>
-              <input
-                type="text"
-                value={skills}
-                onChange={(e) => setSkills(e.target.value)}
-                placeholder="React, AWS, Product Roadmapping, Python"
-                className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">
-                LinkedIn Profile URL
-              </label>
-              <input
-                type="url"
-                value={linkedinUrl}
-                onChange={(e) => setLinkedinUrl(e.target.value)}
-                placeholder="https://linkedin.com/in/username"
-                className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block">
-                GitHub Profile URL
-              </label>
-              <input
-                type="url"
-                value={githubUrl}
-                onChange={(e) => setGithubUrl(e.target.value)}
-                placeholder="https://github.com/username"
-                className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
-              />
-            </div>
-
-            {/* ── Social Media (optional) ── */}
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2 mb-3">
-                <AtSign className="h-4 w-4 text-zinc-500" />
-                <p className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Social Handles</p>
-                <span className="text-[9px] font-semibold text-violet-400 border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 rounded-full">
-                  Optional
-                </span>
+          <form onSubmit={handleProfileSave}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+              <div><label style={labelCls}>Company</label><input style={inputCls} value={company} onChange={e => setCompany(e.target.value)} placeholder="Google, Infosys, etc." /></div>
+              <div><label style={labelCls}>Job Title</label><input style={inputCls} value={title} onChange={e => setTitle(e.target.value)} placeholder="Software Engineer, etc." /></div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelCls}>Professional Bio</label>
+                <textarea style={{ ...inputCls, resize: "none" } as React.CSSProperties} rows={3} value={bio} onChange={e => setBio(e.target.value)} placeholder="Brief career summary..." />
               </div>
-              <p className="text-[10px] text-zinc-600 font-light mb-3">
-                Let batchmates connect with you on social — a privacy-safe alternative to sharing phone numbers.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-                    <span className="text-pink-500 text-xs">▣</span> Instagram
-                  </label>
-                  <input
-                    type="text"
-                    value={instagramUrl}
-                    onChange={(e) => setInstagramUrl(e.target.value)}
-                    placeholder="@username or URL"
-                    className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
-                  />
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelCls}>Skills (comma-separated)</label>
+                <input style={inputCls} value={skills} onChange={e => setSkills(e.target.value)} placeholder="React, Go, Kubernetes" />
+              </div>
+              <div><label style={labelCls}>LinkedIn</label><input style={inputCls} value={linkedinUrl} onChange={e => setLinkedinUrl(e.target.value)} placeholder="https://linkedin.com/in/..." /></div>
+              <div><label style={labelCls}>GitHub</label><input style={inputCls} value={githubUrl} onChange={e => setGithubUrl(e.target.value)} placeholder="https://github.com/..." /></div>
+
+              {/* Social handles */}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <AtSign size={14} color="var(--muted)" />
+                  <span style={{ ...labelCls, margin: 0 }}>Social Handles</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: "var(--blue2)", background: "rgba(74,127,193,0.1)", border: "1px solid rgba(74,127,193,0.2)", padding: "2px 7px", borderRadius: 20 }}>Optional</span>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-                    <span className="text-blue-500 text-xs">▣</span> Facebook
-                  </label>
-                  <input
-                    type="text"
-                    value={facebookUrl}
-                    onChange={(e) => setFacebookUrl(e.target.value)}
-                    placeholder="@username or URL"
-                    className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-                    <span className="text-zinc-300 text-xs">𝕏</span> X / Twitter
-                  </label>
-                  <input
-                    type="text"
-                    value={twitterUrl}
-                    onChange={(e) => setTwitterUrl(e.target.value)}
-                    placeholder="@handle or URL"
-                    className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
-                  />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                  <div><label style={{ ...labelCls, color: "var(--gold2)" }}>◆ Instagram</label><input style={inputCls} value={instagramUrl} onChange={e => setInstagramUrl(e.target.value)} placeholder="@username or URL" /></div>
+                  <div><label style={{ ...labelCls, color: "var(--blue2)" }}>◆ Facebook</label><input style={inputCls} value={facebookUrl} onChange={e => setFacebookUrl(e.target.value)} placeholder="@username or URL" /></div>
+                  <div><label style={{ ...labelCls, color: "var(--grey2)" }}>◆ X / Twitter</label><input style={inputCls} value={twitterUrl} onChange={e => setTwitterUrl(e.target.value)} placeholder="@handle or URL" /></div>
                 </div>
               </div>
-            </div>
 
-            <div className="md:col-span-2 pt-2">
-              <button
-                type="submit"
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-all"
-              >
-                <Save className="h-4 w-4" />
-                Save Profile Card
-              </button>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <button
+                  type="submit"
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    background: "linear-gradient(135deg, var(--gold2), var(--gold))",
+                    color: "#0d1117", fontWeight: 700, fontSize: 13,
+                    padding: "11px 24px", borderRadius: 11, border: "none", cursor: "pointer",
+                    fontFamily: "var(--font-dm-sans, 'DM Sans')",
+                  }}
+                >
+                  <Save size={14} /> Save Profile Card
+                </button>
+              </div>
             </div>
           </form>
         </div>
       )}
 
       {profileSuccess && (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-4 rounded-xl flex items-center gap-2 text-sm font-semibold animate-bounce">
-          <CheckCircle className="h-5 w-5 text-emerald-400" />
-          Profile updated successfully! Check the Alumni Directory to view your updated card.
+        <div style={{ background: "rgba(74,193,107,0.1)", border: "1px solid rgba(74,193,107,0.25)", color: "#4ade80", padding: "12px 16px", borderRadius: 11, fontSize: 13, fontWeight: 600 }}>
+          ✓ Profile updated! Your Alumni Directory card is now live.
         </div>
       )}
 
-      {/* Main Grid: Countdown + Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Countdown Event Timer */}
-        <div className="lg:col-span-2 glass-card rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px]">
+      {/* ── Hero row: Event card + Profile card ── */}
+      <div
+        className="fade-up"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1.5fr) minmax(0, 1fr)",
+          gap: 20,
+        }}
+      >
+        {/* Event countdown card */}
+        <div
+          className="glass-card"
+          style={{ borderRadius: 18, padding: 30, position: "relative", overflow: "hidden" }}
+        >
+          {/* ambient glow */}
+          <div style={{ position: "absolute", top: -60, right: -60, width: 320, height: 320, background: "radial-gradient(circle, rgba(212,168,67,0.07) 0%, transparent 65%)", pointerEvents: "none" }} />
+
           {nextEvent ? (
             <>
-              <div>
-                <span className="text-[10px] font-bold tracking-widest text-violet-400 uppercase bg-violet-500/10 border border-violet-500/20 px-2.5 py-1 rounded-full">
-                  NEXT UPCOMING EVENT
-                </span>
-                <h3 className="text-xl font-bold font-outfit text-white mt-3 truncate">
-                  {nextEvent.title}
-                </h3>
-                <div className="flex flex-wrap gap-4 text-zinc-400 text-xs mt-2 font-light">
-                  <div className="flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 text-zinc-500" />
-                    <span>{nextEvent.location}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-zinc-500" />
-                    <span>{new Date(nextEvent.date).toLocaleDateString(undefined, { dateStyle: 'medium' })}</span>
-                  </div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold2)", background: "rgba(212,168,67,0.1)", border: "1px solid rgba(212,168,67,0.22)", padding: "5px 13px", borderRadius: 20, marginBottom: 14 }}>
+                <div className="animate-pulse-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold2)" }} />
+                Next Upcoming Event
+              </div>
+
+              <h2 style={{ fontFamily: "var(--font-dm-serif, 'DM Serif Display')", fontSize: "clamp(18px, 2.2vw, 26px)", lineHeight: 1.25, marginBottom: 14, color: "var(--text)" }}>
+                {nextEvent.title.split(" ").slice(0, -2).join(" ")}<br />
+                <em style={{ color: "var(--gold2)", fontStyle: "italic" }}>{nextEvent.title.split(" ").slice(-2).join(" ")}</em>
+              </h2>
+
+              <div style={{ display: "flex", gap: 20, marginBottom: 24, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--grey)" }}>
+                  <MapPin size={13} color="var(--blue2)" />
+                  {nextEvent.location}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--grey)" }}>
+                  <Calendar size={13} color="var(--blue2)" />
+                  {new Date(nextEvent.date).toLocaleDateString(undefined, { dateStyle: "medium" })}
                 </div>
               </div>
 
-              {/* Countdown Numbers */}
-              <div className="grid grid-cols-4 gap-2 text-center mt-6 py-3 bg-zinc-950/40 rounded-xl border border-zinc-900/60 max-w-md">
-                <div className="space-y-0.5">
-                  <p className="text-2xl md:text-3xl font-extrabold font-outfit text-white">{String(countdown.days).padStart(2, '0')}</p>
-                  <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Days</p>
-                </div>
-                <div className="space-y-0.5">
-                  <p className="text-2xl md:text-3xl font-extrabold font-outfit text-white">{String(countdown.hours).padStart(2, '0')}</p>
-                  <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Hours</p>
-                </div>
-                <div className="space-y-0.5">
-                  <p className="text-2xl md:text-3xl font-extrabold font-outfit text-white">{String(countdown.minutes).padStart(2, '0')}</p>
-                  <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Min</p>
-                </div>
-                <div className="space-y-0.5">
-                  <p className="text-2xl md:text-3xl font-extrabold font-outfit text-white">{String(countdown.seconds).padStart(2, '0')}</p>
-                  <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Sec</p>
-                </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <CdUnit value={countdown.days}    label="Days" />
+                <CdUnit value={countdown.hours}   label="Hours" />
+                <CdUnit value={countdown.minutes} label="Min" />
+                <CdUnit value={countdown.seconds} label="Sec" />
+              </div>
+
+              <div style={{ marginTop: 24, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <Link href="/dashboard/events">
+                  <button style={{ background: "linear-gradient(135deg, var(--gold2), var(--gold))", color: "#0d1117", fontSize: 13, fontWeight: 700, padding: "10px 20px", borderRadius: 11, border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: "0 4px 16px rgba(212,168,67,0.25)", fontFamily: "var(--font-dm-sans, 'DM Sans')" }}>
+                    <Ticket size={14} /> Register Now →
+                  </button>
+                </Link>
+                <Link href="/dashboard/events">
+                  <button style={{ padding: "10px 20px", borderRadius: 11, fontSize: 13, fontWeight: 600, border: "1px solid var(--border2)", background: "transparent", color: "var(--grey2)", cursor: "pointer", fontFamily: "var(--font-dm-sans, 'DM Sans')" }}>
+                    View Details
+                  </button>
+                </Link>
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center text-center h-full py-8 text-zinc-500">
-              <Calendar className="h-10 w-10 text-zinc-600 mb-2" />
-              <p className="font-outfit font-semibold text-zinc-400">No Upcoming Events Scheduled</p>
-              <p className="text-xs font-light mt-1">Check back later or register interest with administrators.</p>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "40px 0", color: "var(--muted)" }}>
+              <Calendar size={40} color="var(--muted)" style={{ marginBottom: 8 }} />
+              <p style={{ fontFamily: "var(--font-dm-serif, 'DM Serif Display')", color: "var(--grey2)", fontSize: 16 }}>No Upcoming Events</p>
+              <p style={{ fontSize: 12, marginTop: 4 }}>Check back later or contact administrators.</p>
             </div>
           )}
         </div>
 
-        {/* User Card Profile Completeness */}
-        <div className="glass-card rounded-2xl p-6 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              {user?.photoUrl ? (
-                <img
-                  src={user.photoUrl}
-                  alt={user.name}
-                  className="h-12 w-12 rounded-full object-cover border border-zinc-800"
-                />
-              ) : (
-                <div className="h-12 w-12 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 border border-zinc-700">
-                  <Users className="h-5 w-5" />
-                </div>
-              )}
-              <div className="text-left">
-                <h4 className="font-semibold text-white truncate max-w-[150px]">{user?.name}</h4>
-                <p className="text-[10px] text-zinc-400 truncate max-w-[150px]">{user?.email}</p>
-              </div>
-            </div>
+        {/* Profile summary card */}
+        <div className="glass-card" style={{ borderRadius: 18, padding: 26, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div style={{ position: "absolute", top: -30, right: -30, width: 160, height: 160, background: "radial-gradient(circle, rgba(74,127,193,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
 
-            <div className="mt-5 space-y-2 text-xs font-light text-zinc-300">
-              <div className="flex justify-between py-1 border-b border-zinc-900">
-                <span className="text-zinc-500">Professional Title</span>
-                <span className="font-medium text-white truncate max-w-[140px]">{user?.title || "Not Set"}</span>
+          {/* Header */}
+          <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 20 }}>
+            {user?.photoUrl ? (
+              <img src={user.photoUrl} alt={user.name} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border2)", flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg, var(--gold), var(--blue))", display: "grid", placeItems: "center", fontFamily: "var(--font-dm-serif, 'DM Serif Display')", fontSize: 21, color: "#fff", flexShrink: 0, boxShadow: "0 4px 14px rgba(74,127,193,0.3)", position: "relative" }}>
+                {user?.name?.[0]?.toUpperCase() ?? "A"}
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#4ade80", border: "2px solid var(--surface)", position: "absolute", bottom: 2, right: 2 }} />
               </div>
-              <div className="flex justify-between py-1 border-b border-zinc-900">
-                <span className="text-zinc-500">Company</span>
-                <span className="font-medium text-white truncate max-w-[140px]">{user?.company || "Not Set"}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-zinc-500">Skills Added</span>
-                <span className="font-medium text-white truncate max-w-[140px]">
-                  {user?.skills && user.skills.length > 0 ? `${user.skills.length} skills` : "None"}
-                </span>
+            )}
+            <div>
+              <p style={{ fontSize: 17, fontWeight: 600, color: "var(--text)" }}>{user?.name}</p>
+              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{user?.email}</p>
+            </div>
+          </div>
+
+          <div style={{ height: 1, background: "var(--border)", margin: "0 0 14px" }} />
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>Title</span>
+              <span className="badge-gold">{user?.title || "Not set"}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>Company</span>
+              <span className="badge-blue">{user?.company || "Not set"}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginTop: 4 }}>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>Skills</span>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "62%" }}>
+                {(user?.skills?.slice(0, 3) ?? []).map((s, i) => (
+                  <span key={i} className="badge-grey">{s}</span>
+                ))}
+                {(user?.skills?.length ?? 0) > 3 && (
+                  <span className="badge-grey">+{(user?.skills?.length ?? 0) - 3}</span>
+                )}
+                {(!user?.skills || user.skills.length === 0) && <span className="badge-grey">None</span>}
               </div>
             </div>
           </div>
 
           <button
             onClick={() => setIsEditingProfile(true)}
-            className="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white font-semibold text-xs py-2 rounded-xl mt-4 transition-colors flex items-center justify-center gap-1"
+            style={{
+              width: "100%",
+              marginTop: 18,
+              padding: 11,
+              borderRadius: 11,
+              fontSize: 13,
+              fontWeight: 600,
+              border: "1px solid rgba(74,127,193,0.3)",
+              background: "rgba(74,127,193,0.07)",
+              color: "var(--blue2)",
+              cursor: "pointer",
+              fontFamily: "var(--font-dm-sans, 'DM Sans')",
+              transition: "all 0.2s",
+            }}
           >
-            Update Profile Data
-            <ExternalLink className="h-3 w-3 text-zinc-500" />
+            ↗ Update Profile Data
           </button>
         </div>
       </div>
 
-      {/* Network Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {dashboardStats.map((stat, i) => (
-          <div key={i} className="glass-card rounded-2xl p-5 flex items-center gap-4 text-left">
-            <div className={`${stat.color} p-3.5 rounded-2xl`}>
-              <stat.icon className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-2xl font-extrabold font-outfit text-white">{stat.value}</p>
-              <p className="text-xs font-medium text-zinc-400 mt-0.5">{stat.label}</p>
-            </div>
-          </div>
-        ))}
+      {/* ── Stats grid ── */}
+      <div
+        className="fade-up"
+        style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}
+      >
+        <StatCard icon="🤝" value={memberCount} label="Network Members"   delta="+2 this month" accent="gold" />
+        <StatCard icon="📅" value={eventCount}  label="Community Events"  delta="Upcoming"       accent="blue" />
+        <StatCard icon="✨" value={memoryCount} label="Shared Memories"   delta="+1 new"         accent="grey" />
       </div>
 
-      {/* Quick Action links */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-bold font-outfit text-white text-left">Quick Action Grid</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Link
+      {/* ── Quick actions ── */}
+      <div className="fade-up">
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)" }}>
+            Quick Actions
+          </span>
+          <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+          <ActionCard
+            icon="🔍" accent="gold"
+            title="Alumni Directory"
+            desc="Find classmates, view job details, and connect on professional channels across all batches."
             href="/dashboard/directory"
-            className="glass-card rounded-2xl p-5 text-left hover:border-primary hover:shadow-lg hover:shadow-violet-500/5 group"
-          >
-            <h4 className="font-bold text-white group-hover:text-primary transition-colors">Search Alumni Directory</h4>
-            <p className="text-xs font-light text-zinc-400 mt-1 leading-relaxed">
-              Find classmates, view job details, and connect on professional channels.
-            </p>
-          </Link>
-          
-          <Link
+          />
+          <ActionCard
+            icon="🎟" accent="blue"
+            title="Event Registration"
+            desc="Sign up for mixers, homecoming, or panels and retrieve your digital tickets instantly."
             href="/dashboard/events"
-            className="glass-card rounded-2xl p-5 text-left hover:border-primary hover:shadow-lg hover:shadow-violet-500/5 group"
-          >
-            <h4 className="font-bold text-white group-hover:text-primary transition-colors">Event Registration</h4>
-            <p className="text-xs font-light text-zinc-400 mt-1 leading-relaxed">
-              Sign up for mixers, homecoming, or panels and retrieve digital tickets.
-            </p>
-          </Link>
-          
-          <Link
+          />
+          <ActionCard
+            icon="🖼" accent="grey"
+            title="Memory Wall Feed"
+            desc="Post graduation photos, nostalgic memories, and share stories with your batchmates."
             href="/dashboard/memories"
-            className="glass-card rounded-2xl p-5 text-left hover:border-primary hover:shadow-lg hover:shadow-violet-500/5 group"
-          >
-            <h4 className="font-bold text-white group-hover:text-primary transition-colors">Memory Wall Feed</h4>
-            <p className="text-xs font-light text-zinc-400 mt-1 leading-relaxed">
-              Post your favorite graduation photos, nostalgic lectures, and read stories.
-            </p>
-          </Link>
+          />
         </div>
       </div>
     </div>
