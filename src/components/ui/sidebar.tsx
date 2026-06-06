@@ -80,9 +80,9 @@ export default function Sidebar({ isOpen, setIsOpen, onNavClick }: SidebarProps)
           border-color: var(--border);
         }
         .ap-nav-item.active {
-          background: linear-gradient(135deg, rgba(212,168,67,0.13), rgba(74,127,193,0.1));
-          color: var(--gold2);
-          border: 1px solid rgba(212,168,67,0.25);
+          background: rgba(212, 168, 67, 0.08);
+          color: var(--gold);
+          border: 1px solid rgba(212, 168, 67, 0.2);
         }
         .ap-nav-label {
           font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
@@ -207,7 +207,7 @@ export default function Sidebar({ isOpen, setIsOpen, onNavClick }: SidebarProps)
             {user?.photoUrl ? (
               <img src={user.photoUrl} alt={user.name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--border2)", flexShrink: 0 }} />
             ) : (
-              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, var(--gold2), var(--blue2))", display: "grid", placeItems: "center", fontWeight: 700, fontSize: 14, color: "#0d1117", flexShrink: 0 }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, var(--gold2), var(--gold))", display: "grid", placeItems: "center", fontWeight: "bold", fontFamily: "var(--font-dm-serif, 'DM Serif Display')", fontSize: 15, color: "#0d1117", flexShrink: 0 }}>
                 {user?.name?.[0]?.toUpperCase() ?? "A"}
               </div>
             )}

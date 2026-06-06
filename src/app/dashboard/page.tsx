@@ -14,6 +14,8 @@ import {
   ChevronRight,
   Ticket,
   Search,
+  HeartHandshake,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -66,7 +68,7 @@ function StatCard({
   delta,
   accent,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   value: number | string;
   label: string;
   delta: string;
@@ -94,8 +96,8 @@ function StatCard({
           margin: "0 auto 12px",
           display: "grid",
           placeItems: "center",
-          fontSize: 20,
           background: iconBg,
+          color: accent === "gold" ? "var(--gold2)" : accent === "blue" ? "var(--blue2)" : "var(--grey)",
         }}
       >
         {icon}
@@ -299,14 +301,12 @@ export default function DashboardHome() {
           <h1
             style={{
               fontFamily: "var(--font-dm-serif, 'DM Serif Display')",
-              fontSize: "clamp(26px, 5vw, 40px)",
+              fontSize: "clamp(28px, 4.5vw, 42px)",
               lineHeight: 1.1,
-              background: "linear-gradient(120deg, var(--text) 40%, var(--gold2) 80%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
+              color: "var(--text)",
             }}
           >
-            Welcome back, {user?.name}
+            Welcome back, <span className="text-gradient-gold" style={{ display: "inline-block" }}>{user?.name}</span>
           </h1>
           <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>
             {user?.role === "admin"
@@ -484,9 +484,18 @@ export default function DashboardHome() {
                 Next Upcoming Event
               </div>
 
-              <h2 style={{ fontFamily: "var(--font-dm-serif, 'DM Serif Display')", fontSize: "clamp(18px, 2.2vw, 26px)", lineHeight: 1.25, marginBottom: 14, color: "var(--text)" }}>
-                {nextEvent.title.split(" ").slice(0, -2).join(" ")}<br />
-                <em style={{ color: "var(--gold2)", fontStyle: "italic" }}>{nextEvent.title.split(" ").slice(-2).join(" ")}</em>
+              <h2 style={{ fontFamily: "var(--font-dm-serif, 'DM Serif Display')", fontSize: "clamp(20px, 2.5vw, 28px)", lineHeight: 1.25, marginBottom: 14, color: "var(--text)" }}>
+                {nextEvent.title.includes("&") ? (
+                  <>
+                    {nextEvent.title.split("&")[0].trim()}
+                    <br />
+                    <span style={{ color: "var(--gold2)", fontStyle: "italic", fontFamily: "var(--font-dm-serif, 'DM Serif Display')" }}>
+                      &amp; {nextEvent.title.split("&")[1].trim()}
+                    </span>
+                  </>
+                ) : (
+                  nextEvent.title
+                )}
               </h2>
 
               <div style={{ display: "flex", gap: 20, marginBottom: 24, flexWrap: "wrap" }}>
@@ -501,10 +510,10 @@ export default function DashboardHome() {
               </div>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <CdUnit value={countdown.days}    label="Days" />
-                <CdUnit value={countdown.hours}   label="Hours" />
-                <CdUnit value={countdown.minutes} label="Min" />
-                <CdUnit value={countdown.seconds} label="Sec" />
+                <CdUnit value={countdown.days}    label="DAYS" />
+                <CdUnit value={countdown.hours}   label="HOURS" />
+                <CdUnit value={countdown.minutes} label="MIN" />
+                <CdUnit value={countdown.seconds} label="SEC" />
               </div>
 
               <div style={{ marginTop: 24, display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -536,11 +545,14 @@ export default function DashboardHome() {
           {/* Header */}
           <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 20 }}>
             {user?.photoUrl ? (
-              <img src={user.photoUrl} alt={user.name} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border2)", flexShrink: 0 }} />
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <img src={user.photoUrl} alt={user.name} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border2)" }} />
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#4ade80", border: "2px solid var(--surface)", position: "absolute", bottom: 1, right: 1 }} />
+              </div>
             ) : (
-              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg, var(--gold), var(--blue))", display: "grid", placeItems: "center", fontFamily: "var(--font-dm-serif, 'DM Serif Display')", fontSize: 21, color: "#fff", flexShrink: 0, boxShadow: "0 4px 14px rgba(74,127,193,0.3)", position: "relative" }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg, var(--gold2), var(--gold))", display: "grid", placeItems: "center", fontFamily: "var(--font-dm-serif, 'DM Serif Display')", fontSize: 22, color: "#0d1117", fontWeight: "bold", flexShrink: 0, boxShadow: "0 4px 14px rgba(212,168,67,0.3)", position: "relative" }}>
                 {user?.name?.[0]?.toUpperCase() ?? "A"}
-                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#4ade80", border: "2px solid var(--surface)", position: "absolute", bottom: 2, right: 2 }} />
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#4ade80", border: "2px solid var(--surface)", position: "absolute", bottom: 1, right: 1 }} />
               </div>
             )}
             <div>
@@ -601,9 +613,9 @@ export default function DashboardHome() {
         className="fade-up"
         style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}
       >
-        <StatCard icon="🤝" value={memberCount} label="Network Members"   delta="+2 this month" accent="gold" />
-        <StatCard icon="📅" value={eventCount}  label="Community Events"  delta="Upcoming"       accent="blue" />
-        <StatCard icon="✨" value={memoryCount} label="Shared Memories"   delta="+1 new"         accent="grey" />
+        <StatCard icon={<HeartHandshake size={20} />} value={memberCount} label="Network Members"   delta="+2 this month" accent="gold" />
+        <StatCard icon={<Calendar size={20} />} value={eventCount}  label="Community Events"  delta="Upcoming"       accent="blue" />
+        <StatCard icon={<Sparkles size={20} />} value={memoryCount} label="Shared Memories"   delta="+1 new"         accent="grey" />
       </div>
 
       {/* ── Quick actions ── */}
