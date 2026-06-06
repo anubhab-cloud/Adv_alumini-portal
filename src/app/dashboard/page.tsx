@@ -13,7 +13,8 @@ import {
   MapPin,
   Clock,
   Save,
-  Plus
+  Plus,
+  AtSign
 } from "lucide-react";
 import Link from "next/link";
 
@@ -30,6 +31,9 @@ export default function DashboardHome() {
   const [skills, setSkills] = useState(user?.skills?.join(", ") || "");
   const [linkedinUrl, setLinkedinUrl] = useState(user?.linkedinUrl || "");
   const [githubUrl, setGithubUrl] = useState(user?.githubUrl || "");
+  const [instagramUrl, setInstagramUrl] = useState(user?.instagramUrl || "");
+  const [facebookUrl, setFacebookUrl] = useState(user?.facebookUrl || "");
+  const [twitterUrl, setTwitterUrl] = useState(user?.twitterUrl || "");
   const [profileSuccess, setProfileSuccess] = useState(false);
 
   // Load next upcoming event
@@ -81,7 +85,10 @@ export default function DashboardHome() {
         bio,
         skills: skillsArray,
         linkedinUrl,
-        githubUrl
+        githubUrl,
+        instagramUrl,
+        facebookUrl,
+        twitterUrl,
       });
       setProfileSuccess(true);
       setTimeout(() => setProfileSuccess(false), 3000);
@@ -216,6 +223,58 @@ export default function DashboardHome() {
                 placeholder="https://github.com/username"
                 className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
               />
+            </div>
+
+            {/* ── Social Media (optional) ── */}
+            <div className="md:col-span-2">
+              <div className="flex items-center gap-2 mb-3">
+                <AtSign className="h-4 w-4 text-zinc-500" />
+                <p className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Social Handles</p>
+                <span className="text-[9px] font-semibold text-violet-400 border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 rounded-full">
+                  Optional
+                </span>
+              </div>
+              <p className="text-[10px] text-zinc-600 font-light mb-3">
+                Let batchmates connect with you on social — a privacy-safe alternative to sharing phone numbers.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                    <span className="text-pink-500 text-xs">▣</span> Instagram
+                  </label>
+                  <input
+                    type="text"
+                    value={instagramUrl}
+                    onChange={(e) => setInstagramUrl(e.target.value)}
+                    placeholder="@username or URL"
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                    <span className="text-blue-500 text-xs">▣</span> Facebook
+                  </label>
+                  <input
+                    type="text"
+                    value={facebookUrl}
+                    onChange={(e) => setFacebookUrl(e.target.value)}
+                    placeholder="@username or URL"
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                    <span className="text-zinc-300 text-xs">𝕏</span> X / Twitter
+                  </label>
+                  <input
+                    type="text"
+                    value={twitterUrl}
+                    onChange={(e) => setTwitterUrl(e.target.value)}
+                    placeholder="@handle or URL"
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="md:col-span-2 pt-2">

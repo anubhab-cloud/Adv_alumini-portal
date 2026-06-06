@@ -27,6 +27,7 @@ interface AuthContextType {
   ) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<MockUser>) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 email: firebaseUser.email || "",
                 name: userData.name || "",
                 role: userData.role || "alumni",
+                isActive: userData.isActive !== undefined ? userData.isActive : true,
                 batch: userData.batch || "",
                 branch: userData.branch || "",
                 company: userData.company || "",
@@ -65,6 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 photoUrl: userData.photoUrl || "",
                 linkedinUrl: userData.linkedinUrl || "",
                 githubUrl: userData.githubUrl || "",
+                instagramUrl: userData.instagramUrl || "",
+                facebookUrl: userData.facebookUrl || "",
+                twitterUrl: userData.twitterUrl || "",
               });
             } else {
               // Fallback if auth exists but firestore document doesn't yet
@@ -73,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 email: firebaseUser.email || "",
                 name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "User",
                 role: "alumni",
+                isActive: false,
               });
             }
           } else {
@@ -131,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: "admin@alumni.portal",
               name: "Admin Coordinator",
               role: "admin",
+              isActive: true,
               bio: "Official Admin Account",
               photoUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=400"
             };
@@ -143,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: "sarah.chen@gmail.com",
               name: "Sarah Chen",
               role: "alumni",
+              isActive: true,
               batch: "2022",
               branch: "Computer Science & Engineering",
               company: "Google",
@@ -152,6 +160,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               photoUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=400",
               linkedinUrl: "https://linkedin.com",
               githubUrl: "https://github.com",
+              instagramUrl: "https://instagram.com",
+              facebookUrl: "",
+              twitterUrl: "https://x.com",
             };
             mockDb.createUser(sarahUser);
             setUser(sarahUser);
@@ -161,6 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       }
+      setLoading(false);
     } catch (error: any) {
       setLoading(false);
       throw error;
@@ -191,6 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email,
           name,
           role,
+          isActive: role === "admin" ? true : false,
           batch: batch || "",
           branch: branch || "",
           company: "",
@@ -200,6 +213,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           photoUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
           linkedinUrl: "",
           githubUrl: "",
+          instagramUrl: "",
+          facebookUrl: "",
+          twitterUrl: "",
         };
 
         await setDoc(doc(fbDb, "users", uid), userProfile);
@@ -218,6 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email,
           name,
           role,
+          isActive: role === "admin" ? true : false,
           batch,
           branch,
           company: "",
@@ -227,12 +244,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           photoUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
           linkedinUrl: "",
           githubUrl: "",
+          instagramUrl: "",
+          facebookUrl: "",
+          twitterUrl: "",
         };
 
         mockDb.createUser(newUser);
         setUser(newUser);
         localStorage.setItem("mock_current_user", JSON.stringify(newUser));
       }
+      setLoading(false);
     } catch (error: any) {
       setLoading(false);
       throw error;
@@ -274,6 +295,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshUser = async () => {
+    if (!user) return;
+    try {
+      if (isFirebaseEnabled && fbDb) {
+        const docRef = doc(fbDb, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const userData = docSnap.data();
+          const updated: MockUser = {
+            ...user,
+            name: userData.name || user.name,
+            role: userData.role || user.role,
+            isActive: userData.isActive !== undefined ? userData.isActive : user.isActive,
+            batch: userData.batch || user.batch,
+            branch: userData.branch || user.branch,
+            company: userData.company || user.company,
+            title: userData.title || user.title,
+            bio: userData.bio || user.bio,
+            skills: userData.skills || user.skills,
+            photoUrl: userData.photoUrl || user.photoUrl,
+            linkedinUrl: userData.linkedinUrl || user.linkedinUrl,
+            githubUrl: userData.githubUrl || user.githubUrl,
+          };
+          setUser(updated);
+        }
+      } else {
+        const freshUser = mockDb.getUserById(user.uid);
+        if (freshUser) {
+          setUser(freshUser);
+          localStorage.setItem("mock_current_user", JSON.stringify(freshUser));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to refresh user status:", error);
+    }
+  };
+
   const value = {
     user,
     role: user ? user.role : null,
@@ -283,6 +341,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     updateProfile,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

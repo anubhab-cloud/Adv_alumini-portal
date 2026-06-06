@@ -1,0 +1,20 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Development Dockerfile — hot-reload, no build step needed
+# Usage:  docker compose up dev
+# ──────────────────────────────────────────────────────────────────────────────
+FROM node:20-alpine
+
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Source is mounted as a volume at runtime — no COPY needed here
+EXPOSE 3000
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+
+CMD ["npm", "run", "dev"]

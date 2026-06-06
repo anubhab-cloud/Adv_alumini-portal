@@ -1,17 +1,27 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { mockDb, MockEvent } from "@/lib/mockDb";
-import { Calendar, MapPin, Clock, User, ArrowRight, X, AlertCircle } from "lucide-react";
+import { mockDb, MockEvent, MockRegistration } from "@/lib/mockDb";
+import { useAuth } from "@/context/AuthContext";
+import { Calendar, MapPin, Clock, User, ArrowRight, X, AlertCircle, CheckCircle } from "lucide-react";
 import Link from "next/link";
 
 export default function EventHub() {
+  const { user } = useAuth();
   const [events, setEvents] = useState<MockEvent[]>([]);
+  const [registrations, setRegistrations] = useState<MockRegistration[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<MockEvent | null>(null);
 
   useEffect(() => {
     setEvents(mockDb.getEvents());
-  }, []);
+    if (user) {
+      setRegistrations(mockDb.getRegistrationsByUser(user.uid));
+    }
+  }, [user]);
+
+  const getEventRegistration = (eventId: string) => {
+    return registrations.find((r) => r.eventId === eventId);
+  };
 
   return (
     <div className="space-y-6 text-left relative">
@@ -31,6 +41,8 @@ export default function EventHub() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {events.map((event) => {
           const isUpcoming = new Date(event.date).getTime() > Date.now();
+          const userReg = getEventRegistration(event.id);
+          
           return (
             <div
               key={event.id}
@@ -51,9 +63,11 @@ export default function EventHub() {
                     {isUpcoming ? "Upcoming Event" : "Past Event"}
                   </span>
                   
-                  <span className="text-[10px] font-light text-zinc-500">
-                    ID: {event.id}
-                  </span>
+                  {userReg && (
+                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+                      <CheckCircle className="h-2.5 w-2.5" /> Registered
+                    </span>
+                  )}
                 </div>
 
                 {/* Event Info */}
@@ -98,12 +112,30 @@ export default function EventHub() {
                 >
                   View Details
                 </button>
-                {isUpcoming && (
+                {isUpcoming ? (
+                  userReg ? (
+                    <Link
+                      href={`/dashboard/events/ticket?regId=${userReg.id}`}
+                      className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/35 text-amber-450 font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md"
+                    >
+                      View Ticket Pass
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/dashboard/events/register?eventId=${event.id}`}
+                      className="flex-1 bg-primary hover:bg-violet-700 text-white font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md hover:shadow-violet-500/10"
+                    >
+                      Register Now
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  )
+                ) : (
                   <Link
-                    href={`/dashboard/events/register?eventId=${event.id}`}
-                    className="flex-1 bg-primary hover:bg-violet-700 text-white font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md hover:shadow-violet-500/10"
+                    href={`/dashboard/events/gallery?eventId=${event.id}`}
+                    className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/35 text-amber-450 font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md"
                   >
-                    Register Now
+                    View Photo Album
                     <ArrowRight className="h-3 w-3" />
                   </Link>
                 )}
@@ -196,19 +228,47 @@ export default function EventHub() {
                   >
                     Close
                   </button>
-                  <Link
-                    href={`/dashboard/events/register?eventId=${selectedEvent.id}`}
-                    onClick={() => setSelectedEvent(null)}
-                    className="flex-1 bg-primary hover:bg-violet-700 text-white font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md"
-                  >
-                    Register for Event
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
+                  {getEventRegistration(selectedEvent.id) ? (
+                    <Link
+                      href={`/dashboard/events/ticket?regId=${getEventRegistration(selectedEvent.id)!.id}`}
+                      onClick={() => setSelectedEvent(null)}
+                      className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/35 text-amber-450 font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md"
+                    >
+                      View Ticket Pass
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/dashboard/events/register?eventId=${selectedEvent.id}`}
+                      onClick={() => setSelectedEvent(null)}
+                      className="flex-1 bg-primary hover:bg-violet-700 text-white font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md"
+                    >
+                      Register for Event
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  )}
                 </div>
               ) : (
-                <div className="bg-zinc-900/40 border border-zinc-900 text-zinc-500 p-3.5 rounded-xl flex items-center gap-2 text-xs font-light mt-4">
-                  <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                  Registration closed. This event was completed in the past.
+                <div className="pt-4 flex flex-col gap-3">
+                  <div className="bg-zinc-900/40 border border-zinc-900 text-zinc-500 p-3.5 rounded-xl flex items-center gap-2 text-xs font-light">
+                    <AlertCircle className="h-4.5 w-4.5 shrink-0" />
+                    Registration closed. This event was completed in the past.
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setSelectedEvent(null)}
+                      className="flex-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white font-semibold text-xs py-2.5 rounded-xl transition-all"
+                    >
+                      Close
+                    </button>
+                    <Link
+                      href={`/dashboard/events/gallery?eventId=${selectedEvent.id}`}
+                      onClick={() => setSelectedEvent(null)}
+                      className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/35 text-amber-450 font-semibold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md text-center"
+                    >
+                      View Photo Album
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>

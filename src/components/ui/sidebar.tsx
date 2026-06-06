@@ -14,7 +14,10 @@ import {
   LogOut, 
   User,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Briefcase,
+  HeartHandshake,
+  Camera
 } from "lucide-react";
 
 interface SidebarProps {
@@ -36,6 +39,9 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     { label: "Dashboard", href: "/dashboard", icon: Home },
     { label: "Alumni Directory", href: "/dashboard/directory", icon: Users },
     { label: "Event Hub", href: "/dashboard/events", icon: Calendar },
+    { label: "Photo Gallery", href: "/dashboard/gallery", icon: Camera },
+    { label: "Job Board", href: "/dashboard/jobs", icon: Briefcase },
+    { label: "Contributions", href: "/dashboard/contributions", icon: HeartHandshake },
     { label: "Memory Wall", href: "/dashboard/memories", icon: ImageIcon },
   ];
 

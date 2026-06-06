@@ -1,10 +1,11 @@
-// Mock Database for offline testing. Persisted via LocalStorage.
+// Expanded Mock Database for offline testing. Persisted via LocalStorage.
 
 export interface MockUser {
   uid: string;
   email: string;
   name: string;
   role: 'alumni' | 'admin';
+  isActive: boolean; // Admin approval quarantine flag
   batch?: string;
   branch?: string;
   company?: string;
@@ -14,6 +15,10 @@ export interface MockUser {
   photoUrl?: string;
   githubUrl?: string;
   linkedinUrl?: string;
+  // Social media handles (all optional — privacy-first)
+  instagramUrl?: string; // e.g. https://instagram.com/username
+  facebookUrl?: string;  // e.g. https://facebook.com/username
+  twitterUrl?: string;   // e.g. https://twitter.com/username or x.com/username
 }
 
 export interface MockEvent {
@@ -36,6 +41,8 @@ export interface MockRegistration {
   foodPreference: 'Veg' | 'Non-Veg';
   registeredAt: string;
   qrCodeData: string; // Ticket token
+  isCheckedIn: boolean; // Attendance status
+  checkedInAt?: string;
 }
 
 export interface MockMemoryComment {
@@ -63,6 +70,34 @@ export interface MockGalleryImage {
   url: string;
   title: string;
   uploadedAt: string;
+  type: 'photo' | 'video';
+  category: '2026 Reunion' | 'Sports' | 'Cultural' | 'Batch Photos';
+  batch: string; // e.g. "All" or "2020", "2022", etc.
+  eventId?: string;
+  uploadedBy?: string;
+  uploadedById?: string;
+}
+
+export interface MockJob {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  type: 'Full-time' | 'Part-time' | 'Internship' | 'Contract';
+  description: string;
+  postedBy: string;
+  postedById: string;
+  postedAt: string;
+  applicants: string[]; // List of user uids
+}
+
+export interface MockContribution {
+  id: string;
+  userId: string;
+  userName: string;
+  amount: number;
+  date: string;
+  txToken: string;
 }
 
 const DEFAULT_USERS: MockUser[] = [
@@ -71,6 +106,7 @@ const DEFAULT_USERS: MockUser[] = [
     email: "sarah.chen@gmail.com",
     name: "Sarah Chen",
     role: "alumni",
+    isActive: true, // Pre-approved
     batch: "2022",
     branch: "Computer Science & Engineering",
     company: "Google",
@@ -86,6 +122,7 @@ const DEFAULT_USERS: MockUser[] = [
     email: "marcus.vance@gmail.com",
     name: "Marcus Vance",
     role: "alumni",
+    isActive: true, // Pre-approved
     batch: "2020",
     branch: "Electronics & Communication Engineering",
     company: "Tesla",
@@ -101,6 +138,7 @@ const DEFAULT_USERS: MockUser[] = [
     email: "priya.sharma@gmail.com",
     name: "Priya Sharma",
     role: "alumni",
+    isActive: true, // Pre-approved
     batch: "2021",
     branch: "Information Technology",
     company: "Stripe",
@@ -116,6 +154,7 @@ const DEFAULT_USERS: MockUser[] = [
     email: "admin@alumni.portal",
     name: "Admin Coordinator",
     role: "admin",
+    isActive: true, // Pre-approved
     bio: "Official Advanced Alumni Portal administrative coordinator account.",
     photoUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=400",
   }
@@ -139,6 +178,15 @@ const DEFAULT_EVENTS: MockEvent[] = [
     location: "Grand Hyatt Regency, San Francisco",
     coordinator: "Sarah Chen",
     activities: ["AI panel discussion", "Q&A with Speakers", "Cocktails & Networking Session"]
+  },
+  {
+    id: "event-past-1",
+    title: "Silver Jubilee Reunion Class of 2000",
+    description: "Celebrating 25 years of graduating! A nostalgic weekend on campus with interactive panels, memories sharing session, and a campus walk down memory lane.",
+    date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(), // 45 days ago
+    location: "Auditorium Hall & Lake View Ground",
+    coordinator: "Admin Coordinator",
+    activities: ["Homecoming Registration", "Panel: 25 Years of Tech Growth", "Alumni Banquet Dinner", "Nostalgic Campus Walk"]
   }
 ];
 
@@ -184,22 +232,137 @@ const DEFAULT_MEMORIES: MockMemory[] = [
 
 const DEFAULT_GALLERY: MockGalleryImage[] = [
   {
+    id: "gal-p1",
+    url: "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=800",
+    title: "Alumni Panel Discussion Q&A",
+    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
+    type: "photo",
+    category: "2026 Reunion",
+    batch: "All",
+    eventId: "event-past-1",
+    uploadedBy: "Marcus Vance",
+    uploadedById: "mock-user-2"
+  },
+  {
+    id: "gal-p2",
+    url: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&q=80&w=800",
+    title: "Homecoming Group Photo Auditorium",
+    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
+    type: "photo",
+    category: "2026 Reunion",
+    batch: "All",
+    eventId: "event-past-1",
+    uploadedBy: "Sarah Chen",
+    uploadedById: "mock-user-1"
+  },
+  {
     id: "gal-1",
     url: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&q=80&w=800",
     title: "Main Campus Landmark View",
-    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 90).toISOString()
+    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 90).toISOString(),
+    type: "photo",
+    category: "2026 Reunion",
+    batch: "All"
   },
   {
     id: "gal-2",
     url: "https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&q=80&w=800",
     title: "Annual Hackathon Winner Presentation",
-    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString()
+    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
+    type: "photo",
+    category: "Batch Photos",
+    batch: "2022"
   },
   {
     id: "gal-3",
     url: "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=800",
     title: "Alumni Panel Meet 2025",
-    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20).toISOString()
+    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20).toISOString(),
+    type: "photo",
+    category: "2026 Reunion",
+    batch: "All"
+  },
+  {
+    id: "gal-4",
+    url: "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&q=80&w=800",
+    title: "Alumni Soccer Championship Trophy",
+    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
+    type: "photo",
+    category: "Sports",
+    batch: "2020"
+  },
+  {
+    id: "gal-5",
+    url: "https://images.unsplash.com/photo-1469371670807-013ccf25f16a?auto=format&fit=crop&q=80&w=800",
+    title: "Cultural Night Music Festival",
+    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
+    type: "photo",
+    category: "Cultural",
+    batch: "2021"
+  },
+  {
+    id: "gal-v1",
+    url: "https://assets.mixkit.co/videos/preview/mixkit-group-of-friends-raising-toast-at-dinner-party-40243-large.mp4",
+    title: "Homecoming Gala Highlights Dinner Toast",
+    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    type: "video",
+    category: "2026 Reunion",
+    batch: "All"
+  },
+  {
+    id: "gal-v2",
+    url: "https://assets.mixkit.co/videos/preview/mixkit-people-celebrating-at-a-concert-with-confetti-and-lights-34293-large.mp4",
+    title: "Cultural Festival DJ Night Celebrations",
+    uploadedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
+    type: "video",
+    category: "Cultural",
+    batch: "2021"
+  }
+];
+
+const DEFAULT_JOBS: MockJob[] = [
+  {
+    id: "job-1",
+    title: "Senior Full Stack Engineer (Next.js & Go)",
+    company: "Google",
+    location: "Bangalore, India",
+    type: "Full-time",
+    description: "Looking for a seasoned developer to join our core cloud platform team. Requires 5+ years of experience building performant React frontend sites and Go microservices. Alumni referral available!",
+    postedBy: "Sarah Chen",
+    postedById: "mock-user-1",
+    postedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    applicants: []
+  },
+  {
+    id: "job-2",
+    title: "Product Design Intern",
+    company: "Stripe",
+    location: "Remote (APAC)",
+    type: "Internship",
+    description: "Join the Stripe payment flows design team for a 6-month internship. You will work alongside engineers and product managers to redesign merchant onboarding checkouts. Ideal for final-year students.",
+    postedBy: "Priya Sharma",
+    postedById: "mock-user-3",
+    postedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
+    applicants: []
+  }
+];
+
+const DEFAULT_CONTRIBUTIONS: MockContribution[] = [
+  {
+    id: "contrib-1",
+    userId: "mock-user-1",
+    userName: "Sarah Chen",
+    amount: 15000,
+    date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
+    txToken: "TXN-87612345"
+  },
+  {
+    id: "contrib-2",
+    userId: "mock-user-2",
+    userName: "Marcus Vance",
+    amount: 10000,
+    date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
+    txToken: "TXN-12398745"
   }
 ];
 
@@ -236,15 +399,25 @@ export const mockDb = {
     if (!localStorage.getItem("mock_gallery")) {
       setStorageItem("mock_gallery", DEFAULT_GALLERY);
     }
+    if (!localStorage.getItem("mock_jobs")) {
+      setStorageItem("mock_jobs", DEFAULT_JOBS);
+    }
+    if (!localStorage.getItem("mock_contributions")) {
+      setStorageItem("mock_contributions", DEFAULT_CONTRIBUTIONS);
+    }
   },
 
   // User Operations
   getUsers: (): MockUser[] => {
-    return getStorageItem<MockUser[]>("mock_users", DEFAULT_USERS);
+    const users = getStorageItem<MockUser[]>("mock_users", DEFAULT_USERS);
+    return users.map(u => ({
+      ...u,
+      isActive: u.isActive !== undefined ? u.isActive : true
+    }));
   },
   
   getUserById: (uid: string): MockUser | undefined => {
-    const users = getStorageItem<MockUser[]>("mock_users", DEFAULT_USERS);
+    const users = mockDb.getUsers();
     return users.find(u => u.uid === uid);
   },
 
@@ -261,6 +434,18 @@ export const mockDb = {
       users.push(user);
       setStorageItem("mock_users", users);
     }
+  },
+
+  approveUser: (uid: string): void => {
+    const users = getStorageItem<MockUser[]>("mock_users", DEFAULT_USERS);
+    const updatedUsers = users.map(u => (u.uid === uid ? { ...u, isActive: true } : u));
+    setStorageItem("mock_users", updatedUsers);
+  },
+
+  deleteUser: (uid: string): void => {
+    const users = getStorageItem<MockUser[]>("mock_users", DEFAULT_USERS);
+    const filtered = users.filter(u => u.uid !== uid);
+    setStorageItem("mock_users", filtered);
   },
 
   // Event Operations
@@ -288,12 +473,13 @@ export const mockDb = {
     return getStorageItem<MockRegistration[]>("mock_registrations", []);
   },
 
-  createRegistration: (reg: Omit<MockRegistration, 'id' | 'registeredAt'>): MockRegistration => {
+  createRegistration: (reg: Omit<MockRegistration, 'id' | 'registeredAt' | 'isCheckedIn'>): MockRegistration => {
     const registrations = getStorageItem<MockRegistration[]>("mock_registrations", []);
-    const newReg = {
+    const newReg: MockRegistration = {
       ...reg,
       id: `reg-${Date.now()}`,
-      registeredAt: new Date().toISOString()
+      registeredAt: new Date().toISOString(),
+      isCheckedIn: false
     };
     registrations.push(newReg);
     setStorageItem("mock_registrations", registrations);
@@ -305,10 +491,20 @@ export const mockDb = {
     return registrations.filter(r => r.userId === userId);
   },
 
+  checkInRegistration: (regId: string): MockRegistration | undefined => {
+    const registrations = getStorageItem<MockRegistration[]>("mock_registrations", []);
+    const updated = registrations.map(r => (r.id === regId || r.qrCodeData === regId ? {
+      ...r,
+      isCheckedIn: true,
+      checkedInAt: new Date().toISOString()
+    } : r));
+    setStorageItem("mock_registrations", updated);
+    return updated.find(r => r.id === regId || r.qrCodeData === regId);
+  },
+
   // Memories Operations
   getMemories: (): MockMemory[] => {
     const memories = getStorageItem<MockMemory[]>("mock_memories", DEFAULT_MEMORIES);
-    // Sort by created date descending
     return [...memories].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
@@ -359,19 +555,88 @@ export const mockDb = {
 
   // Gallery Operations
   getGalleryImages: (): MockGalleryImage[] => {
-    return getStorageItem<MockGalleryImage[]>("mock_gallery", DEFAULT_GALLERY);
+    const images = getStorageItem<MockGalleryImage[]>("mock_gallery", DEFAULT_GALLERY);
+    // Ensure all have required properties mapped in case of legacy items
+    return images.map(img => ({
+      ...img,
+      type: img.type || 'photo',
+      category: img.category || '2026 Reunion',
+      batch: img.batch || 'All'
+    }));
   },
 
-  uploadGalleryImage: (url: string, title: string): MockGalleryImage => {
+  uploadGalleryImage: (
+    url: string, 
+    title: string, 
+    type: 'photo' | 'video', 
+    category: '2026 Reunion' | 'Sports' | 'Cultural' | 'Batch Photos', 
+    batch: string,
+    eventId?: string,
+    uploadedBy?: string,
+    uploadedById?: string
+  ): MockGalleryImage => {
     const gallery = getStorageItem<MockGalleryImage[]>("mock_gallery", DEFAULT_GALLERY);
-    const newImg = {
+    const newImg: MockGalleryImage = {
       id: `gal-${Date.now()}`,
       url,
       title,
-      uploadedAt: new Date().toISOString()
+      uploadedAt: new Date().toISOString(),
+      type,
+      category,
+      batch,
+      eventId,
+      uploadedBy,
+      uploadedById
     };
     gallery.push(newImg);
     setStorageItem("mock_gallery", gallery);
     return newImg;
+  },
+
+  // Job Board Operations
+  getJobs: (): MockJob[] => {
+    return getStorageItem<MockJob[]>("mock_jobs", DEFAULT_JOBS);
+  },
+
+  createJob: (job: Omit<MockJob, 'id' | 'postedAt' | 'applicants'>): MockJob => {
+    const jobs = getStorageItem<MockJob[]>("mock_jobs", DEFAULT_JOBS);
+    const newJob: MockJob = {
+      ...job,
+      id: `job-${Date.now()}`,
+      postedAt: new Date().toISOString(),
+      applicants: []
+    };
+    jobs.push(newJob);
+    setStorageItem("mock_jobs", jobs);
+    return newJob;
+  },
+
+  applyToJob: (jobId: string, userUid: string): void => {
+    const jobs = getStorageItem<MockJob[]>("mock_jobs", DEFAULT_JOBS);
+    const updated = jobs.map(j => {
+      if (j.id === jobId && !j.applicants.includes(userUid)) {
+        return { ...j, applicants: [...j.applicants, userUid] };
+      }
+      return j;
+    });
+    setStorageItem("mock_jobs", updated);
+  },
+
+  // Contribution Operations
+  getContributions: (): MockContribution[] => {
+    return getStorageItem<MockContribution[]>("mock_contributions", DEFAULT_CONTRIBUTIONS);
+  },
+
+  createContribution: (contrib: Omit<MockContribution, 'id' | 'date' | 'txToken'>): MockContribution => {
+    const contributions = getStorageItem<MockContribution[]>("mock_contributions", DEFAULT_CONTRIBUTIONS);
+    const newContrib: MockContribution = {
+      ...contrib,
+      id: `contrib-${Date.now()}`,
+      date: new Date().toISOString(),
+      txToken: `TXN-${Math.floor(10000000 + Math.random() * 90000000)}`
+    };
+    contributions.push(newContrib);
+    setStorageItem("mock_contributions", contributions);
+    return newContrib;
   }
 };
