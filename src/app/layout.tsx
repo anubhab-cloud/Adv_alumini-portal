@@ -19,6 +19,16 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Advanced Alumni Portal",
   description: "Connect, engage, and grow with your fellow alumni. Share memories, attend events, and build careers.",
+  viewport: "width=device-width, initial-scale=1, viewport-fit=cover",
+  themeColor: "#0f1117",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Alumni Portal",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export default function RootLayout({
