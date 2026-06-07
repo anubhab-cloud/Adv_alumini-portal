@@ -56,28 +56,31 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <Script id="strip-extension-tags" strategy="beforeInteractive" suppressHydrationWarning>
-          {`
-            (function() {
-              const observer = new MutationObserver((mutations) => {
-                for (let i = 0; i < mutations.length; i++) {
-                  const addedNodes = mutations[i].addedNodes;
-                  for (let j = 0; j < addedNodes.length; j++) {
-                    const node = addedNodes[j];
-                    if (node.nodeType === 1) {
-                      if (node.hasAttribute('bis_skin_checked')) node.removeAttribute('bis_skin_checked');
-                      const elements = node.querySelectorAll('[bis_skin_checked]');
-                      for (let k = 0; k < elements.length; k++) elements[k].removeAttribute('bis_skin_checked');
+        <script
+          id="strip-extension-tags"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                const observer = new MutationObserver((mutations) => {
+                  for (let i = 0; i < mutations.length; i++) {
+                    const addedNodes = mutations[i].addedNodes;
+                    for (let j = 0; j < addedNodes.length; j++) {
+                      const node = addedNodes[j];
+                      if (node.nodeType === 1) {
+                        if (node.hasAttribute('bis_skin_checked')) node.removeAttribute('bis_skin_checked');
+                        const elements = node.querySelectorAll('[bis_skin_checked]');
+                        for (let k = 0; k < elements.length; k++) elements[k].removeAttribute('bis_skin_checked');
+                      }
                     }
+                    const target = mutations[i].target;
+                    if (target.nodeType === 1 && target.hasAttribute('bis_skin_checked')) target.removeAttribute('bis_skin_checked');
                   }
-                  const target = mutations[i].target;
-                  if (target.nodeType === 1 && target.hasAttribute('bis_skin_checked')) target.removeAttribute('bis_skin_checked');
-                }
-              });
-              observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['bis_skin_checked'] });
-            })();
-          `}
-        </Script>
+                });
+                observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['bis_skin_checked'] });
+              })();
+            `
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col bg-[#0d1117] text-[#e8edf5] font-sans" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
