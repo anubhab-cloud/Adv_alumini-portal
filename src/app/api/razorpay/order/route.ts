@@ -8,8 +8,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid amount specified." }, { status: 400 });
     }
 
-    const keyId = "rzp_test_SuvDD9siyulFm8";
-    const keySecret = "pNPY0BztUhf8KTlByE7zQtsb";
+    const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_SuvDD9siyulFm8";
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || "pNPY0BztUhf8KTlByE7zQtsb";
 
     // Encode credentials for HTTP Basic Authentication
     const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");

@@ -97,7 +97,7 @@ export default function ContributionsPage() {
 
       // 2. Open Razorpay options
       const options = {
-        key: "rzp_test_SuvDD9siyulFm8",
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_SuvDD9siyulFm8",
         amount: orderData.amount,
         currency: orderData.currency,
         name: "Advanced Alumni Portal",
