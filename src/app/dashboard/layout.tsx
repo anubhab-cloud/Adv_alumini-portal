@@ -141,10 +141,10 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col md:flex-row relative dashboard-theme dashboard-theme-root">
+    <div className="h-[100dvh] bg-zinc-950 flex flex-col md:flex-row relative dashboard-theme dashboard-theme-root" style={{ height: '100dvh' }}>
 
       {/* ── Desktop Sidebar ─────────────────────────────────────── */}
-      <div className="hidden md:block shrink-0">
+      <div className="hidden md:block shrink-0" style={{ width: sidebarExpanded ? 260 : 72, transition: "width 0.3s cubic-bezier(.4,0,.2,1)" }}>
         <Sidebar isOpen={sidebarExpanded} setIsOpen={setSidebarExpanded} onNavClick={() => {}} />
       </div>
 
@@ -190,10 +190,10 @@ export default function DashboardLayout({
       </div>
 
       {/* ── Main Content Area ───────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 max-w-full overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
 
         {/* Mobile top header */}
-        <header className="flex items-center justify-between h-14 px-3 border-b border-zinc-900 md:hidden bg-zinc-950/90 backdrop-blur-md sticky top-0 z-20 safe-top">
+        <header className="flex items-center justify-between h-14 px-3 border-b border-zinc-900 md:hidden bg-zinc-950/90 backdrop-blur-md shrink-0 z-20 safe-top">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors touch-target"
@@ -212,21 +212,26 @@ export default function DashboardLayout({
           </Link>
 
           {/* Profile avatar — right side */}
-          {user?.photoUrl ? (
-            <img
-              src={user.photoUrl}
-              alt={user.name}
-              className="h-8 w-8 rounded-full object-cover border border-zinc-700"
-            />
-          ) : (
-            <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 text-xs font-bold">
-              {user?.name?.[0]?.toUpperCase() ?? "A"}
-            </div>
-          )}
+          <Link href="/dashboard/profile" className="flex items-center">
+            {user?.photoUrl ? (
+              <img
+                src={user.photoUrl}
+                alt={user.name}
+                className="h-8 w-8 rounded-full object-cover border border-zinc-700 hover:border-blue-400 transition-colors"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 text-xs font-bold hover:border-blue-400 transition-colors">
+                {user?.name?.[0]?.toUpperCase() ?? "A"}
+              </div>
+            )}
+          </Link>
         </header>
 
-        {/* Page content — extra bottom padding on mobile so content clears the bottom nav */}
-        <main className="flex-1 overflow-y-auto scroll-smooth-touch px-3 py-4 md:px-8 md:py-8 pb-24 md:pb-8 max-w-7xl mx-auto w-full">
+        {/* Page content */}
+        <main
+          className="flex-1 min-h-0 px-3 py-4 md:px-8 md:py-8 pb-24 md:pb-8 max-w-7xl mx-auto w-full"
+          style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
+        >
           {children}
         </main>
       </div>

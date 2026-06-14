@@ -42,6 +42,10 @@ const navItems = [
     label: "Memory Wall", href: "/dashboard/memories", section: "Community",
     icon: <svg className="nav-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
   },
+  {
+    label: "My Profile", href: "/dashboard/profile", section: "Account",
+    icon: <svg className="nav-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  },
 ];
 
 const adminItem = {
@@ -190,42 +194,44 @@ export default function Sidebar({ isOpen, setIsOpen, onNavClick }: SidebarProps)
 
         {/* User section */}
         <div style={{ padding: "12px", borderTop: "1px solid var(--border)" }}>
-          <div
-            style={{
-              padding: "14px 18px",
-              borderRadius: 12,
-              background: "var(--surface2)",
-              border: "1px solid var(--border)",
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              cursor: "pointer",
-              justifyContent: isOpen ? "flex-start" : "center",
-            }}
-          >
-            {/* Avatar */}
-            {user?.photoUrl ? (
-              <img src={user.photoUrl} alt={user.name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--border2)", flexShrink: 0 }} />
-            ) : (
-              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, var(--gold2), var(--gold))", display: "grid", placeItems: "center", fontWeight: "bold", fontFamily: "var(--font-dm-serif, 'DM Serif Display')", fontSize: 15, color: "#0d1117", flexShrink: 0 }}>
-                {user?.name?.[0]?.toUpperCase() ?? "A"}
-              </div>
-            )}
+          <Link href="/dashboard/profile" style={{ textDecoration: "none" }} onClick={onNavClick}>
+            <div
+              style={{
+                padding: "14px 18px",
+                borderRadius: 12,
+                background: "var(--surface2)",
+                border: "1px solid var(--border)",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                cursor: "pointer",
+                justifyContent: isOpen ? "flex-start" : "center",
+              }}
+            >
+              {/* Avatar */}
+              {user?.photoUrl ? (
+                <img src={user.photoUrl} alt={user.name} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--border2)", flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, var(--gold2), var(--gold))", display: "grid", placeItems: "center", fontWeight: "bold", fontFamily: "var(--font-dm-serif, 'DM Serif Display')", fontSize: 15, color: "#0d1117", flexShrink: 0 }}>
+                  {user?.name?.[0]?.toUpperCase() ?? "A"}
+                </div>
+              )}
 
-            {isOpen && (
-              <>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", fontFamily: "var(--font-dm-sans, 'DM Sans')" }}>{user?.name ?? "Guest"}</div>
-                  <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                    {role ?? "Alumni"} · {user?.batch ?? "–"}
+              {isOpen && (
+                <>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", fontFamily: "var(--font-dm-sans, 'DM Sans')" }}>{user?.name ?? "Guest"}</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                      {role ?? "Alumni"} · {user?.batch ?? "–"}
+                    </div>
                   </div>
-                </div>
-                <div style={{ marginLeft: "auto", color: "var(--muted)", flexShrink: 0 }}>
-                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
-                </div>
-              </>
-            )}
-          </div>
+                  <div style={{ marginLeft: "auto", color: "var(--muted)", flexShrink: 0 }}>
+                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                  </div>
+                </>
+              )}
+            </div>
+          </Link>
 
           {/* Logout */}
           <button

@@ -52,7 +52,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${dmSans.variable} ${dmSerif.variable} ${outfit.variable} ${inter.variable} h-full antialiased`}
+      className={`${dmSans.variable} ${dmSerif.variable} ${outfit.variable} ${inter.variable} antialiased`}
       suppressHydrationWarning
     >
       <head>
@@ -82,7 +82,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col bg-[#0d1117] text-[#e8edf5] font-sans" suppressHydrationWarning>
+      <body className="bg-[#0d1117] text-[#e8edf5] font-sans" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
