@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -57,6 +57,7 @@ export default function Sidebar({ isOpen, setIsOpen, onNavClick }: SidebarProps)
   const pathname = usePathname();
   const { user, logout, role } = useAuth();
   const router = useRouter();
+  const [showBetaModal, setShowBetaModal] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -98,6 +99,14 @@ export default function Sidebar({ isOpen, setIsOpen, onNavClick }: SidebarProps)
           margin-left: auto; background: var(--blue); color: #fff;
           font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px;
         }
+        .vc-beta-btn {
+          color: #9b87c8;
+        }
+        .vc-beta-btn:hover {
+          background: rgba(155,135,200,0.08);
+          border-color: rgba(155,135,200,0.2);
+          color: #b8a8e0;
+        }
       `}</style>
 
       <aside
@@ -138,6 +147,31 @@ export default function Sidebar({ isOpen, setIsOpen, onNavClick }: SidebarProps)
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: "0 12px", overflowY: "auto" }} className="scroll-smooth-touch">
+          {/* Virtual Campus — Beta */}
+          <button
+            onClick={() => setShowBetaModal(true)}
+            title={!isOpen ? "Virtual Campus" : undefined}
+            className="ap-nav-item vc-beta-btn"
+            style={{ justifyContent: isOpen ? "flex-start" : "center", width: "100%", marginBottom: 2 }}
+          >
+            <svg className="nav-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" style={{ flexShrink: 0 }}>
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+              <path d="M9 22V12h6v10"/>
+            </svg>
+            {isOpen && (
+              <>
+                <span style={{ flex: 1, textAlign: "left" }}>Virtual Campus</span>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+                  color: "#9b87c8",
+                  padding: "1px 6px", borderRadius: 4,
+                  border: "1px solid rgba(155,135,200,0.35)",
+                  textTransform: "uppercase",
+                  lineHeight: "16px",
+                }}>beta</span>
+              </>
+            )}
+          </button>
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const showSection = item.section && item.section !== currentSection;
@@ -261,6 +295,68 @@ export default function Sidebar({ isOpen, setIsOpen, onNavClick }: SidebarProps)
           </button>
         </div>
       </aside>
+
+      {/* Virtual Campus Beta Modal */}
+      {showBetaModal && (
+        <div
+          onClick={() => setShowBetaModal(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 999,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 16,
+              padding: "32px 28px 28px",
+              maxWidth: 380,
+              width: "90%",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#9b87c8" strokeWidth="1.8">
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                <path d="M9 22V12h6v10"/>
+              </svg>
+              <span style={{
+                fontFamily: "var(--font-dm-sans, 'DM Sans')",
+                fontSize: 15, fontWeight: 600, color: "var(--text)",
+              }}>Virtual Campus</span>
+              <span style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+                color: "#9b87c8", padding: "1px 6px", borderRadius: 4,
+                border: "1px solid rgba(155,135,200,0.35)",
+                textTransform: "uppercase", lineHeight: "16px",
+              }}>beta</span>
+            </div>
+
+            <p style={{
+              fontSize: 13.5, color: "var(--muted)", lineHeight: 1.65,
+              fontFamily: "var(--font-dm-sans, 'DM Sans')",
+              borderTop: "1px solid var(--border)", paddingTop: 16, marginBottom: 24,
+            }}>
+              Virtual Campus is currently in development — an immersive space to explore the college, relive memories, and connect with alumni. It&apos;ll be available here once it&apos;s ready.
+            </p>
+
+            <button
+              onClick={() => setShowBetaModal(false)}
+              style={{
+                padding: "8px 20px", borderRadius: 8,
+                background: "var(--surface2)",
+                border: "1px solid var(--border)",
+                color: "var(--grey2)", fontSize: 13, fontWeight: 500,
+                cursor: "pointer", fontFamily: "var(--font-dm-sans, 'DM Sans')",
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

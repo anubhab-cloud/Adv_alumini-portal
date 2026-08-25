@@ -4,7 +4,8 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { mockDb, MockEvent, MockRegistration } from "@/lib/mockDb";
-import { Calendar, CheckCircle2, QrCode, ArrowLeft, Loader2, Utensils, AlertCircle } from "lucide-react";
+import { mockRedis } from "@/lib/mockRedis";
+import { Calendar, CheckCircle2, QrCode, ArrowLeft, Loader2, Utensils, AlertCircle, Sparkles } from "lucide-react";
 import Link from "next/link";
 import QRCode from "qrcode";
 
@@ -16,6 +17,10 @@ function EventRegistrationForm() {
   const eventId = searchParams.get("eventId");
   const [event, setEvent] = useState<MockEvent | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Capacity and Waitlist states
+  const [capacityLeft, setCapacityLeft] = useState<number>(300);
+  const [waitlistCount, setWaitlistCount] = useState<number>(0);
 
   // Form states
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
@@ -37,6 +42,12 @@ function EventRegistrationForm() {
       setEvent(found);
       // Preselect all activities by default
       setSelectedActivities(found.activities || []);
+
+      // Initialize capacities and waitlist
+      const initialCapacity = found.capacity ?? 300;
+      const currentCap = mockRedis.getCounter(`event-capacity:${found.id}`, initialCapacity);
+      setCapacityLeft(currentCap);
+      setWaitlistCount(mockRedis.zrange(`event-waitlist:${found.id}`).length);
     }
     setLoading(false);
   }, [eventId]);
@@ -68,6 +79,19 @@ function EventRegistrationForm() {
         }
       });
 
+      // Get current capacity
+      const initialCapacity = event.capacity ?? 300;
+      const currentCap = mockRedis.getCounter(`event-capacity:${event.id}`, initialCapacity);
+      const isFull = currentCap <= 0;
+
+      if (!isFull) {
+        // Decrement capacity counter in Redis
+        mockRedis.decr(`event-capacity:${event.id}`, initialCapacity);
+      } else {
+        // Add to priority waitlist
+        mockRedis.zadd(`event-waitlist:${event.id}`, Date.now(), user.uid);
+      }
+
       // Save registration in mockDb
       const newRegistration = mockDb.createRegistration({
         eventId: event.id,
@@ -76,7 +100,8 @@ function EventRegistrationForm() {
         userEmail: user.email,
         activitiesSelected: selectedActivities,
         foodPreference: foodPreference,
-        qrCodeData: registrationToken
+        qrCodeData: registrationToken,
+        isWaitlisted: isFull
       });
 
       setRegistration(newRegistration);
@@ -117,25 +142,41 @@ function EventRegistrationForm() {
 
   // POST SUBMIT SCREEN
   if (registration) {
+    const queuePosition = registration.isWaitlisted && user
+      ? mockRedis.zrank(`event-waitlist:${registration.eventId}`, user.uid) + 1
+      : 0;
+
     return (
       <div className="max-w-md mx-auto space-y-6 text-left animate-in fade-in duration-300">
         <div className="text-center">
-          <div className="inline-flex bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-full text-emerald-400 mb-3">
-            <CheckCircle2 className="h-10 w-10" />
-          </div>
-          <h2 className="text-2xl font-bold font-outfit text-white">Registration Complete!</h2>
-          <p className="text-zinc-400 text-sm mt-1 font-light">Your ticket pass has been successfully generated.</p>
+          {registration.isWaitlisted ? (
+            <>
+              <div className="inline-flex bg-amber-500/10 border border-amber-500/20 p-3 rounded-full text-amber-400 mb-3 animate-pulse">
+                <Sparkles className="h-10 w-10" />
+              </div>
+              <h2 className="text-2xl font-bold font-outfit text-white">Added to Waitlist!</h2>
+              <p className="text-zinc-400 text-sm mt-1 font-light">Event was fully booked. You are in line for a pass.</p>
+            </>
+          ) : (
+            <>
+              <div className="inline-flex bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-full text-emerald-400 mb-3">
+                <CheckCircle2 className="h-10 w-10" />
+              </div>
+              <h2 className="text-2xl font-bold font-outfit text-white">Registration Complete!</h2>
+              <p className="text-zinc-400 text-sm mt-1 font-light">Your ticket pass has been successfully generated.</p>
+            </>
+          )}
         </div>
 
         {/* Boarding Pass Ticket */}
         <div className="bg-white text-zinc-950 rounded-2xl overflow-hidden shadow-2xl relative border border-zinc-200">
           
           {/* Header */}
-          <div className="bg-primary text-white p-5 flex items-center gap-3">
+          <div className={`${registration.isWaitlisted ? "bg-gradient-to-r from-amber-500 to-orange-500" : "bg-primary"} text-white p-5 flex items-center gap-3`}>
             <Calendar className="h-6 w-6 text-violet-200" />
             <div className="text-left">
               <h3 className="font-bold font-outfit text-sm truncate max-w-[280px]">
-                {event.title}
+                {event.title} {registration.isWaitlisted && " (WAITLISTED)"}
               </h3>
               <p className="text-[10px] text-violet-200 mt-0.5">
                 {new Date(event.date).toLocaleDateString(undefined, { dateStyle: 'long' })}
@@ -154,6 +195,16 @@ function EventRegistrationForm() {
                 <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-bold">Food Preference</span>
                 <span className="font-semibold text-zinc-800">{registration.foodPreference}</span>
               </div>
+
+              {registration.isWaitlisted && (
+                <div className="col-span-2 pt-2 border-t border-dashed border-zinc-200">
+                  <span className="text-[10px] text-amber-600 uppercase tracking-wider block font-bold">Waitlist Queue</span>
+                  <span className="font-bold text-zinc-900 text-sm">Queue Position: #{queuePosition}</span>
+                  <p className="text-[10px] text-zinc-500 mt-0.5 font-light leading-snug">
+                    You've been added to the queue via virtual Redis Sorted Set. If a seat opens up, you will be promoted.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="text-xs pt-2 border-t border-dashed border-zinc-200">
@@ -178,7 +229,7 @@ function EventRegistrationForm() {
                 />
               )}
               <span className="text-[10px] font-mono text-zinc-500 mt-2">
-                Ticket ID: {registration.qrCodeData}
+                {registration.isWaitlisted ? "Waitlist Token: " : "Ticket ID: "}{registration.qrCodeData}
               </span>
             </div>
           </div>
@@ -229,11 +280,24 @@ function EventRegistrationForm() {
       {/* Main Form */}
       <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 md:p-8 space-y-6">
         {/* Event header card */}
-        <div className="p-4 bg-zinc-900/60 border border-zinc-900 rounded-xl">
-          <h3 className="font-bold text-white text-sm font-outfit">{event.title}</h3>
-          <p className="text-zinc-400 text-xs font-light mt-1 leading-normal">
-            Location: {event.location}
-          </p>
+        <div className="p-4 bg-zinc-900/60 border border-zinc-900 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h3 className="font-bold text-white text-sm font-outfit">{event.title}</h3>
+            <p className="text-zinc-400 text-xs font-light mt-1 leading-normal">
+              Location: {event.location}
+            </p>
+          </div>
+          <div className="shrink-0 self-start sm:self-auto">
+            {capacityLeft > 0 ? (
+              <span className="inline-block text-[10px] font-bold px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-450 border border-emerald-500/20 uppercase tracking-wide">
+                {capacityLeft} Seats Left
+              </span>
+            ) : (
+              <span className="inline-block text-[10px] font-bold px-2.5 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wide">
+                Waitlist Active ({waitlistCount} queued)
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Checkbox activities list */}

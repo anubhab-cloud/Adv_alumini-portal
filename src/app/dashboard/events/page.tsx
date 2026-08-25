@@ -1,28 +1,29 @@
 "use client";
-
+ 
 import React, { useState, useEffect } from "react";
 import { mockDb, MockEvent, MockRegistration } from "@/lib/mockDb";
+import { mockRedis } from "@/lib/mockRedis";
 import { useAuth } from "@/context/AuthContext";
 import { Calendar, MapPin, Clock, User, ArrowRight, X, AlertCircle, CheckCircle } from "lucide-react";
 import Link from "next/link";
-
+ 
 export default function EventHub() {
   const { user } = useAuth();
   const [events, setEvents] = useState<MockEvent[]>([]);
   const [registrations, setRegistrations] = useState<MockRegistration[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<MockEvent | null>(null);
-
+ 
   useEffect(() => {
     setEvents(mockDb.getEvents());
     if (user) {
       setRegistrations(mockDb.getRegistrationsByUser(user.uid));
     }
   }, [user]);
-
+ 
   const getEventRegistration = (eventId: string) => {
     return registrations.find((r) => r.eventId === eventId);
   };
-
+ 
   return (
     <div className="space-y-6 text-left relative">
       {/* Title */}
@@ -36,12 +37,17 @@ export default function EventHub() {
           </p>
         </div>
       </div>
-
+ 
       {/* Grid of Events */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {events.map((event) => {
           const isUpcoming = new Date(event.date).getTime() > Date.now();
           const userReg = getEventRegistration(event.id);
+ 
+          // Get capacity metrics from Redis
+          const initialCapacity = event.capacity ?? 300;
+          const currentCap = mockRedis.getCounter(`event-capacity:${event.id}`, initialCapacity);
+          const waitlistSize = mockRedis.zrange(`event-waitlist:${event.id}`).length;
           
           return (
             <div
@@ -53,23 +59,43 @@ export default function EventHub() {
               <div>
                 {/* Event Status Badge */}
                 <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={`inline-block text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                      isUpcoming
-                        ? "bg-violet-500/10 text-violet-400 border border-violet-500/25"
-                        : "bg-zinc-800 text-zinc-500 border border-zinc-800"
-                    }`}
-                  >
-                    {isUpcoming ? "Upcoming Event" : "Past Event"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                        isUpcoming
+                          ? "bg-violet-500/10 text-violet-400 border border-violet-500/25"
+                          : "bg-zinc-800 text-zinc-500 border border-zinc-800"
+                      }`}
+                    >
+                      {isUpcoming ? "Upcoming Event" : "Past Event"}
+                    </span>
+ 
+                    {isUpcoming && !userReg && (
+                      currentCap > 0 ? (
+                        <span className="text-[9px] font-bold text-emerald-450 border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase">
+                          {currentCap} Seats Left
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-bold text-amber-450 border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 rounded-full uppercase">
+                          Waitlist Active ({waitlistSize} queued)
+                        </span>
+                      )
+                    )}
+                  </div>
                   
                   {userReg && (
-                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
-                      <CheckCircle className="h-2.5 w-2.5" /> Registered
-                    </span>
+                    userReg.isWaitlisted ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider bg-amber-500/10 text-amber-450 border border-amber-500/25">
+                        Waitlisted (Pos #{user && mockRedis.zrank(`event-waitlist:${event.id}`, user.uid) + 1})
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+                        <CheckCircle className="h-2.5 w-2.5" /> Registered
+                      </span>
+                    )
                   )}
                 </div>
-
+ 
                 {/* Event Info */}
                 <h3 className="font-bold text-white text-lg font-outfit mt-4 leading-snug">
                   {event.title}

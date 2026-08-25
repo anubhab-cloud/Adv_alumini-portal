@@ -5,7 +5,7 @@ export interface MockUser {
   email: string;
   name: string;
   role: 'alumni' | 'admin';
-  isActive: boolean; // Admin approval quarantine flag
+  isActive: boolean;
   batch?: string;
   branch?: string;
   company?: string;
@@ -15,20 +15,20 @@ export interface MockUser {
   photoUrl?: string;
   githubUrl?: string;
   linkedinUrl?: string;
-  // Social media handles (all optional — privacy-first)
-  instagramUrl?: string; // e.g. https://instagram.com/username
-  facebookUrl?: string;  // e.g. https://facebook.com/username
-  twitterUrl?: string;   // e.g. https://twitter.com/username or x.com/username
+  instagramUrl?: string;
+  facebookUrl?: string;
+  twitterUrl?: string;
 }
 
 export interface MockEvent {
   id: string;
   title: string;
   description: string;
-  date: string; // ISO string
+  date: string;
   location: string;
   coordinator: string;
   activities: string[];
+  capacity?: number;
 }
 
 export interface MockRegistration {
@@ -40,9 +40,10 @@ export interface MockRegistration {
   activitiesSelected: string[];
   foodPreference: 'Veg' | 'Non-Veg';
   registeredAt: string;
-  qrCodeData: string; // Ticket token
-  isCheckedIn: boolean; // Attendance status
+  qrCodeData: string;
+  isCheckedIn: boolean;
   checkedInAt?: string;
+  isWaitlisted?: boolean;
 }
 
 export interface MockMemoryComment {
@@ -72,7 +73,7 @@ export interface MockGalleryImage {
   uploadedAt: string;
   type: 'photo' | 'video';
   category: '2026 Reunion' | 'Sports' | 'Cultural' | 'Batch Photos';
-  batch: string; // e.g. "All" or "2020", "2022", etc.
+  batch: string;
   eventId?: string;
   uploadedBy?: string;
   uploadedById?: string;
@@ -88,7 +89,7 @@ export interface MockJob {
   postedBy: string;
   postedById: string;
   postedAt: string;
-  applicants: string[]; // List of user uids
+  applicants: string[];
 }
 
 export interface MockContribution {
@@ -98,6 +99,40 @@ export interface MockContribution {
   amount: number;
   date: string;
   txToken: string;
+}
+
+// ─── Audit Log ───────────────────────────────────────────────────────────────
+export type AuditAction =
+  | 'approve_user'
+  | 'delete_user'
+  | 'restore_user'
+  | 'toggle_role'
+  | 'create_event'
+  | 'delete_event'
+  | 'restore_event'
+  | 'upload_gallery'
+  | 'delete_gallery'
+  | 'restore_gallery'
+  | 'checkin'
+  | 'undo_checkin';
+
+export interface AuditEntry {
+  id: string;
+  action: AuditAction;
+  adminName: string;
+  adminUid: string;
+  target: string;       // human-readable target label
+  targetId: string;
+  timestamp: string;
+  meta?: Record<string, string | number | boolean>;
+}
+
+// ─── Trash (soft-delete bins) ─────────────────────────────────────────────────
+export interface TrashEntry<T> {
+  id: string;
+  data: T;
+  deletedAt: string;
+  deletedBy: string;
 }
 
 const DEFAULT_USERS: MockUser[] = [
@@ -168,7 +203,8 @@ const DEFAULT_EVENTS: MockEvent[] = [
     date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 12).toISOString(), // 12 days from now
     location: "Main Campus Auditorium & Gardens",
     coordinator: "Admin Coordinator",
-    activities: ["Campus Tour", "Formal Networking Dinner", "Alumni vs Student Football Match", "Keynote Addresses"]
+    activities: ["Campus Tour", "Formal Networking Dinner", "Alumni vs Student Football Match", "Keynote Addresses"],
+    capacity: 5
   },
   {
     id: "event-2",
@@ -177,7 +213,8 @@ const DEFAULT_EVENTS: MockEvent[] = [
     date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 35).toISOString(), // 35 days from now
     location: "Grand Hyatt Regency, San Francisco",
     coordinator: "Sarah Chen",
-    activities: ["AI panel discussion", "Q&A with Speakers", "Cocktails & Networking Session"]
+    activities: ["AI panel discussion", "Q&A with Speakers", "Cocktails & Networking Session"],
+    capacity: 2
   },
   {
     id: "event-past-1",
@@ -186,7 +223,8 @@ const DEFAULT_EVENTS: MockEvent[] = [
     date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(), // 45 days ago
     location: "Auditorium Hall & Lake View Ground",
     coordinator: "Admin Coordinator",
-    activities: ["Homecoming Registration", "Panel: 25 Years of Tech Growth", "Alumni Banquet Dinner", "Nostalgic Campus Walk"]
+    activities: ["Homecoming Registration", "Panel: 25 Years of Tech Growth", "Alumni Banquet Dinner", "Nostalgic Campus Walk"],
+    capacity: 100
   }
 ];
 
@@ -638,5 +676,122 @@ export const mockDb = {
     contributions.push(newContrib);
     setStorageItem("mock_contributions", contributions);
     return newContrib;
-  }
+  },
+
+  // ─── Audit Log ────────────────────────────────────────────────────────────
+  getAuditLog: (): AuditEntry[] => {
+    return getStorageItem<AuditEntry[]>("mock_audit_log", []);
+  },
+
+  addAuditEntry: (entry: Omit<AuditEntry, 'id' | 'timestamp'>): AuditEntry => {
+    const log = getStorageItem<AuditEntry[]>("mock_audit_log", []);
+    const newEntry: AuditEntry = {
+      ...entry,
+      id: `audit-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+    };
+    log.unshift(newEntry);
+    if (log.length > 200) log.pop();
+    setStorageItem("mock_audit_log", log);
+    return newEntry;
+  },
+
+  // ─── Soft-delete: Users ───────────────────────────────────────────────────
+  softDeleteUser: (uid: string, deletedBy: string): MockUser | undefined => {
+    const users = getStorageItem<MockUser[]>("mock_users", DEFAULT_USERS);
+    const target = users.find(u => u.uid === uid);
+    if (!target) return undefined;
+    const trash = getStorageItem<TrashEntry<MockUser>[]>("trash_users", []);
+    trash.unshift({ id: `trash-${uid}`, data: target, deletedAt: new Date().toISOString(), deletedBy });
+    setStorageItem("trash_users", trash);
+    setStorageItem("mock_users", users.filter(u => u.uid !== uid));
+    return target;
+  },
+
+  getTrashedUsers: (): TrashEntry<MockUser>[] => {
+    return getStorageItem<TrashEntry<MockUser>[]>("trash_users", []);
+  },
+
+  restoreUser: (uid: string): MockUser | undefined => {
+    const trash = getStorageItem<TrashEntry<MockUser>[]>("trash_users", []);
+    const entry = trash.find(t => t.data.uid === uid);
+    if (!entry) return undefined;
+    const users = getStorageItem<MockUser[]>("mock_users", DEFAULT_USERS);
+    if (!users.some(u => u.uid === uid)) {
+      users.push(entry.data);
+      setStorageItem("mock_users", users);
+    }
+    setStorageItem("trash_users", trash.filter(t => t.data.uid !== uid));
+    return entry.data;
+  },
+
+  // ─── Soft-delete: Events ──────────────────────────────────────────────────
+  softDeleteEvent: (id: string, deletedBy: string): MockEvent | undefined => {
+    const events = getStorageItem<MockEvent[]>("mock_events", DEFAULT_EVENTS);
+    const target = events.find(e => e.id === id);
+    if (!target) return undefined;
+    const trash = getStorageItem<TrashEntry<MockEvent>[]>("trash_events", []);
+    trash.unshift({ id: `trash-${id}`, data: target, deletedAt: new Date().toISOString(), deletedBy });
+    setStorageItem("trash_events", trash);
+    setStorageItem("mock_events", events.filter(e => e.id !== id));
+    return target;
+  },
+
+  getTrashedEvents: (): TrashEntry<MockEvent>[] => {
+    return getStorageItem<TrashEntry<MockEvent>[]>("trash_events", []);
+  },
+
+  restoreEvent: (id: string): MockEvent | undefined => {
+    const trash = getStorageItem<TrashEntry<MockEvent>[]>("trash_events", []);
+    const entry = trash.find(t => t.data.id === id);
+    if (!entry) return undefined;
+    const events = getStorageItem<MockEvent[]>("mock_events", DEFAULT_EVENTS);
+    if (!events.some(e => e.id === id)) {
+      events.push(entry.data);
+      setStorageItem("mock_events", events);
+    }
+    setStorageItem("trash_events", trash.filter(t => t.data.id !== id));
+    return entry.data;
+  },
+
+  // ─── Soft-delete: Gallery ─────────────────────────────────────────────────
+  softDeleteGalleryImage: (id: string, deletedBy: string): MockGalleryImage | undefined => {
+    const gallery = getStorageItem<MockGalleryImage[]>("mock_gallery", DEFAULT_GALLERY);
+    const target = gallery.find(g => g.id === id);
+    if (!target) return undefined;
+    const trash = getStorageItem<TrashEntry<MockGalleryImage>[]>("trash_gallery", []);
+    trash.unshift({ id: `trash-${id}`, data: target, deletedAt: new Date().toISOString(), deletedBy });
+    setStorageItem("trash_gallery", trash);
+    setStorageItem("mock_gallery", gallery.filter(g => g.id !== id));
+    return target;
+  },
+
+  getTrashedGallery: (): TrashEntry<MockGalleryImage>[] => {
+    return getStorageItem<TrashEntry<MockGalleryImage>[]>("trash_gallery", []);
+  },
+
+  restoreGalleryImage: (id: string): MockGalleryImage | undefined => {
+    const trash = getStorageItem<TrashEntry<MockGalleryImage>[]>("trash_gallery", []);
+    const entry = trash.find(t => t.data.id === id);
+    if (!entry) return undefined;
+    const gallery = getStorageItem<MockGalleryImage[]>("mock_gallery", DEFAULT_GALLERY);
+    if (!gallery.some(g => g.id === id)) {
+      gallery.push(entry.data);
+      setStorageItem("mock_gallery", gallery);
+    }
+    setStorageItem("trash_gallery", trash.filter(t => t.data.id !== id));
+    return entry.data;
+  },
+
+  // ─── Undo check-in ────────────────────────────────────────────────────────
+  undoCheckIn: (regId: string): MockRegistration | undefined => {
+    const registrations = getStorageItem<MockRegistration[]>("mock_registrations", []);
+    const updated = registrations.map(r =>
+      (r.id === regId || r.qrCodeData === regId)
+        ? { ...r, isCheckedIn: false, checkedInAt: undefined }
+        : r
+    );
+    setStorageItem("mock_registrations", updated);
+    return updated.find(r => r.id === regId || r.qrCodeData === regId);
+  },
 };

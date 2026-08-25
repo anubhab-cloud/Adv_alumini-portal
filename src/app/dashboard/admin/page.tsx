@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { mockDb, MockEvent, MockGalleryImage, MockUser, MockContribution, MockRegistration } from "@/lib/mockDb";
+import { mockDb, MockEvent, MockGalleryImage, MockUser, MockContribution, MockRegistration, AuditEntry, TrashEntry } from "@/lib/mockDb";
+import { mockRedis } from "@/lib/mockRedis";
 import { useRouter } from "next/navigation";
 import { 
   ShieldAlert, 
@@ -26,7 +27,11 @@ import {
   ScanLine,
   Coins,
   QrCode,
-  Play
+  Play,
+  RotateCcw,
+  ClipboardList,
+  AlertTriangle,
+  Undo2
 } from "lucide-react";
 
 export default function AdminControlCenter() {
@@ -34,7 +39,7 @@ export default function AdminControlCenter() {
   const router = useRouter();
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'analytics' | 'events' | 'gallery' | 'users' | 'contributions' | 'attendance'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'events' | 'gallery' | 'users' | 'contributions' | 'attendance' | 'audit' | 'trash'>('analytics');
 
   // Stats state
   const [stats, setStats] = useState({
@@ -53,6 +58,7 @@ export default function AdminControlCenter() {
   const [currentActivity, setCurrentActivity] = useState("");
   const [eventSuccess, setEventSuccess] = useState(false);
   const [eventError, setEventError] = useState<string | null>(null);
+  const [eventCapacity, setEventCapacity] = useState("300");
 
   // Gallery builder state
   const [galleryImages, setGalleryImages] = useState<MockGalleryImage[]>([]);
@@ -72,6 +78,13 @@ export default function AdminControlCenter() {
   const [ticketCodeInput, setTicketCodeInput] = useState("");
   const [scanResultMsg, setScanResultMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+
+  // Audit log + trash state
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  const [trashedUsers, setTrashedUsers] = useState<TrashEntry<MockUser>[]>([]);
+  const [trashedEvents, setTrashedEvents] = useState<TrashEntry<MockEvent>[]>([]);
+  const [trashedGallery, setTrashedGallery] = useState<TrashEntry<MockGalleryImage>[]>([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Extended Analytics State for event checks and catering logs
   const [analytics, setAnalytics] = useState({
@@ -103,6 +116,7 @@ export default function AdminControlCenter() {
       loadUsers();
       loadContributions();
       loadRegistrations();
+      loadAuditAndTrash();
     }
   }, [role]);
 
@@ -219,22 +233,57 @@ export default function AdminControlCenter() {
     setRegistrationsList(mockDb.getRegistrations());
   };
 
+  const loadAuditAndTrash = () => {
+    setAuditLog(mockDb.getAuditLog());
+    setTrashedUsers(mockDb.getTrashedUsers());
+    setTrashedEvents(mockDb.getTrashedEvents());
+    setTrashedGallery(mockDb.getTrashedGallery());
+  };
+
+  const audit = (action: AuditEntry['action'], target: string, targetId: string, meta?: Record<string, string | number | boolean>) => {
+    mockDb.addAuditEntry({
+      action,
+      adminName: user?.name ?? 'Admin',
+      adminUid: user?.uid ?? '',
+      target,
+      targetId,
+      meta,
+    });
+    setAuditLog(mockDb.getAuditLog());
+  };
+
   // User Actions
   const handleApproveUser = (uid: string) => {
     mockDb.approveUser(uid);
+    const u = mockDb.getUserById(uid);
+    audit('approve_user', u?.name ?? uid, uid);
     loadUsers();
     loadStats();
   };
 
   const handleDeleteUser = (uid: string) => {
-    mockDb.deleteUser(uid);
+    const u = mockDb.getUserById(uid);
+    mockDb.softDeleteUser(uid, user?.name ?? 'Admin');
+    audit('delete_user', u?.name ?? uid, uid);
+    setConfirmDeleteId(null);
     loadUsers();
+    loadAuditAndTrash();
+    loadStats();
+  };
+
+  const handleRestoreUser = (uid: string) => {
+    const restored = mockDb.restoreUser(uid);
+    if (restored) audit('restore_user', restored.name, uid);
+    loadUsers();
+    loadAuditAndTrash();
     loadStats();
   };
 
   const handleToggleRole = (uid: string, currentRole: 'admin' | 'alumni') => {
     const nextRole = currentRole === 'admin' ? 'alumni' : 'admin';
     mockDb.updateUser(uid, { role: nextRole });
+    const u = mockDb.getUserById(uid);
+    audit('toggle_role', u?.name ?? uid, uid, { from: currentRole, to: nextRole });
     loadUsers();
   };
 
@@ -249,6 +298,7 @@ export default function AdminControlCenter() {
       setIsScanning(false);
       const result = mockDb.checkInRegistration(code);
       if (result) {
+        audit('checkin', result.userName, result.id, { eventId: result.eventId });
         setScanResultMsg({
           type: 'success',
           text: `Checked in successfully: ${result.userName} for event! Certificate unlocked.`
@@ -263,6 +313,14 @@ export default function AdminControlCenter() {
         });
       }
     }, 700);
+  };
+
+  const handleUndoCheckIn = (regId: string, userName: string) => {
+    mockDb.undoCheckIn(regId);
+    audit('undo_checkin', userName, regId);
+    loadRegistrations();
+    loadStats();
+    loadAuditAndTrash();
   };
 
   // STRICT ROLE GUARD RENDERING
@@ -309,14 +367,23 @@ export default function AdminControlCenter() {
 
     setEventError(null);
     try {
-      mockDb.createEvent({
+      const capVal = parseInt(eventCapacity, 10) || 300;
+      const newEvent = mockDb.createEvent({
         title,
         description,
         date: new Date(date).toISOString(),
         location,
         coordinator: user?.name || "Admin Coordinator",
-        activities
+        activities,
+        capacity: capVal
       });
+
+      // Save initial counter in simulated Redis
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`redis:counter:event-capacity:${newEvent.id}`, capVal.toString());
+      }
+
+      audit('create_event', title, newEvent.id, { capacity: capVal });
 
       // Clear Form
       setTitle("");
@@ -324,6 +391,7 @@ export default function AdminControlCenter() {
       setDate("");
       setLocation("");
       setActivities([]);
+      setEventCapacity("300");
       setEventSuccess(true);
       setTimeout(() => setEventSuccess(false), 4000);
       loadStats();
@@ -360,13 +428,17 @@ export default function AdminControlCenter() {
 
     setIsUploading(true);
     try {
-      mockDb.uploadGalleryImage(
+      const newImg = mockDb.uploadGalleryImage(
         finalUrl, 
         galleryTitle,
         galleryType,
         galleryCategory,
-        galleryBatch
+        galleryBatch,
+        undefined,
+        user?.name,
+        user?.uid
       );
+      audit('upload_gallery', galleryTitle, newImg.id, { type: galleryType, category: galleryCategory });
       
       setGalleryTitle("");
       setGalleryFilePreview(null);
@@ -384,85 +456,140 @@ export default function AdminControlCenter() {
     }
   };
 
+  const handleDeleteGalleryItem = (id: string, title: string) => {
+    mockDb.softDeleteGalleryImage(id, user?.name ?? 'Admin');
+    audit('delete_gallery', title, id);
+    loadGallery();
+    loadAuditAndTrash();
+  };
+
+  const handleRestoreGalleryItem = (id: string) => {
+    const restored = mockDb.restoreGalleryImage(id);
+    if (restored) audit('restore_gallery', restored.title, id);
+    loadGallery();
+    loadAuditAndTrash();
+  };
+
+  const handleDeleteEvent = (id: string, title: string) => {
+    mockDb.softDeleteEvent(id, user?.name ?? 'Admin');
+    audit('delete_event', title, id);
+    loadStats();
+    loadAuditAndTrash();
+  };
+
+  const handleRestoreEvent = (id: string) => {
+    const restored = mockDb.restoreEvent(id);
+    if (restored) audit('restore_event', restored.title, id);
+    loadStats();
+    loadAuditAndTrash();
+  };
+
+  // Audit action labels
+  const auditLabel: Record<string, string> = {
+    approve_user: 'Approved user',
+    delete_user: 'Deleted user',
+    restore_user: 'Restored user',
+    toggle_role: 'Changed role',
+    create_event: 'Created event',
+    delete_event: 'Deleted event',
+    restore_event: 'Restored event',
+    upload_gallery: 'Uploaded to gallery',
+    delete_gallery: 'Deleted gallery item',
+    restore_gallery: 'Restored gallery item',
+    checkin: 'Checked in attendee',
+    undo_checkin: 'Undid check-in',
+  };
+
+  const auditColor: Record<string, string> = {
+    approve_user: '#4ade80',
+    delete_user: '#f87171',
+    restore_user: '#34d399',
+    toggle_role: '#fbbf24',
+    create_event: '#60a5fa',
+    delete_event: '#f87171',
+    restore_event: '#34d399',
+    upload_gallery: '#a78bfa',
+    delete_gallery: '#f87171',
+    restore_gallery: '#34d399',
+    checkin: '#4ade80',
+    undo_checkin: '#fbbf24',
+  };
+
   return (
     <div className="space-y-6 text-left">
-      {/* Title Header */}
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold font-outfit text-white leading-tight">
-          Admin Control Center
-        </h1>
-        <p className="text-zinc-400 text-sm font-light mt-1">
-          Monitor directory analytics, compile new events, and edit the official gallery files.
-        </p>
+
+      {/* ── ADMIN IDENTITY BANNER ── */}
+      <div style={{
+        background: "linear-gradient(135deg, rgba(220,38,38,0.08), rgba(234,88,12,0.05))",
+        border: "1px solid rgba(220,38,38,0.2)",
+        borderRadius: 14,
+        padding: "14px 20px",
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+      }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+          background: "rgba(220,38,38,0.12)",
+          border: "1px solid rgba(220,38,38,0.25)",
+          display: "grid", placeItems: "center",
+        }}>
+          <ShieldAlert className="h-5 w-5" style={{ color: "#f87171" }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#fca5a5", fontFamily: "var(--font-outfit, 'Outfit')" }}>
+              Admin Control Center
+            </span>
+            <span style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+              background: "rgba(220,38,38,0.15)", color: "#f87171",
+              padding: "2px 7px", borderRadius: 4, border: "1px solid rgba(220,38,38,0.3)",
+            }}>
+              Restricted
+            </span>
+          </div>
+          <p style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>
+            Logged in as <strong style={{ color: "#fca5a5" }}>{user?.name}</strong> — all actions are audited and reversible.
+          </p>
+        </div>
+        <div style={{ fontSize: 11, color: "var(--muted)", flexShrink: 0, textAlign: "right" }}>
+          <div style={{ color: "#f87171", fontWeight: 600 }}>{auditLog.length} actions</div>
+          <div>in audit log</div>
+        </div>
       </div>
 
       {/* Tabs list */}
-      <div className="flex flex-wrap border-b border-zinc-800 bg-zinc-950/40 p-1.5 rounded-xl border max-w-3xl gap-1">
-        <button
-          onClick={() => setActiveTab('analytics')}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            activeTab === 'analytics'
-              ? "bg-rose-600 text-white shadow-lg"
-              : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <BarChart3 className="h-4 w-4" />
-          Analytics
+      <div className="flex flex-wrap bg-zinc-950/40 p-1.5 rounded-xl border border-zinc-800 gap-1">
+        <button onClick={() => setActiveTab('analytics')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'analytics' ? "bg-rose-600 text-white shadow-lg" : "text-zinc-400 hover:text-white"}`}>
+          <BarChart3 className="h-4 w-4" /> Analytics
         </button>
-        <button
-          onClick={() => setActiveTab('users')}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            activeTab === 'users'
-              ? "bg-rose-600 text-white shadow-lg"
-              : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <UserCheck className="h-4 w-4" />
-          Manage Users
+        <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'users' ? "bg-rose-600 text-white shadow-lg" : "text-zinc-400 hover:text-white"}`}>
+          <UserCheck className="h-4 w-4" /> Manage Users
         </button>
-        <button
-          onClick={() => setActiveTab('events')}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            activeTab === 'events'
-              ? "bg-rose-600 text-white shadow-lg"
-              : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <CalendarPlus className="h-4 w-4" />
-          Event Manager
+        <button onClick={() => setActiveTab('events')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'events' ? "bg-rose-600 text-white shadow-lg" : "text-zinc-400 hover:text-white"}`}>
+          <CalendarPlus className="h-4 w-4" /> Event Manager
         </button>
-        <button
-          onClick={() => setActiveTab('attendance')}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            activeTab === 'attendance'
-              ? "bg-rose-600 text-white shadow-lg"
-              : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <ScanLine className="h-4 w-4" />
-          Attendance Scanner
+        <button onClick={() => setActiveTab('attendance')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'attendance' ? "bg-rose-600 text-white shadow-lg" : "text-zinc-400 hover:text-white"}`}>
+          <ScanLine className="h-4 w-4" /> Attendance Scanner
         </button>
-        <button
-          onClick={() => setActiveTab('contributions')}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            activeTab === 'contributions'
-              ? "bg-rose-600 text-white shadow-lg"
-              : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <Receipt className="h-4 w-4" />
-          Contributions Ledger
+        <button onClick={() => setActiveTab('contributions')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'contributions' ? "bg-rose-600 text-white shadow-lg" : "text-zinc-400 hover:text-white"}`}>
+          <Receipt className="h-4 w-4" /> Contributions Ledger
         </button>
-        <button
-          onClick={() => setActiveTab('gallery')}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            activeTab === 'gallery'
-              ? "bg-rose-600 text-white shadow-lg"
-              : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <ImageIcon className="h-4 w-4" />
-          Gallery Uploader
+        <button onClick={() => setActiveTab('gallery')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'gallery' ? "bg-rose-600 text-white shadow-lg" : "text-zinc-400 hover:text-white"}`}>
+          <ImageIcon className="h-4 w-4" /> Gallery Uploader
+        </button>
+        <button onClick={() => setActiveTab('audit')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'audit' ? "bg-amber-600 text-white shadow-lg" : "text-zinc-400 hover:text-white"}`}>
+          <ClipboardList className="h-4 w-4" /> Audit Log
+          {auditLog.length > 0 && <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[9px] font-bold px-1.5 py-0.5 rounded">{auditLog.length}</span>}
+        </button>
+        <button onClick={() => setActiveTab('trash')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${activeTab === 'trash' ? "bg-zinc-600 text-white shadow-lg" : "text-zinc-400 hover:text-white"}`}>
+          <Trash2 className="h-4 w-4" /> Trash
+          {(trashedUsers.length + trashedEvents.length + trashedGallery.length) > 0 && (
+            <span className="bg-zinc-700 text-zinc-300 border border-zinc-600 text-[9px] font-bold px-1.5 py-0.5 rounded">
+              {trashedUsers.length + trashedEvents.length + trashedGallery.length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1022,7 +1149,7 @@ export default function AdminControlCenter() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block">
                     Event Date & Time
@@ -1045,6 +1172,21 @@ export default function AdminControlCenter() {
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="Campus Auditorium, Zoom Link, etc."
+                    className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block">
+                    Seat Capacity
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={eventCapacity}
+                    onChange={(e) => setEventCapacity(e.target.value)}
+                    placeholder="e.g. 300"
                     className="w-full glass-input rounded-xl px-4 py-2.5 text-sm text-white font-light"
                     required
                   />
@@ -1104,19 +1246,61 @@ export default function AdminControlCenter() {
           <div className="glass-card rounded-2xl p-6 h-fit space-y-4">
             <h4 className="text-sm font-bold font-outfit text-white">Current Launches ({mockDb.getEvents().length})</h4>
             <div className="space-y-3">
-              {mockDb.getEvents().map((e) => (
-                <div key={e.id} className="p-3 bg-zinc-900/40 border border-zinc-900 rounded-xl text-xs text-left">
-                  <h5 className="font-semibold text-white truncate">{e.title}</h5>
-                  <div className="flex items-center gap-1 text-zinc-500 mt-1">
-                    <Clock className="h-3 w-3" />
-                    <span>{new Date(e.date).toLocaleDateString()}</span>
+              {mockDb.getEvents().map((e) => {
+                const initialCap = e.capacity ?? 300;
+                const remaining = mockRedis.getCounter(`event-capacity:${e.id}`, initialCap);
+                const waitlistedUids = mockRedis.zrange(`event-waitlist:${e.id}`);
+
+                return (
+                  <div key={e.id} className="p-3 bg-zinc-900/40 border border-zinc-900 rounded-xl text-xs text-left space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h5 className="font-semibold text-white truncate">{e.title}</h5>
+                        <div className="flex items-center gap-1 text-zinc-500 mt-1">
+                          <Clock className="h-3 w-3" />
+                          <span>{new Date(e.date).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-zinc-500 mt-0.5">
+                          <MapPin className="h-3 w-3" />
+                          <span className="truncate">{e.location}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteEvent(e.id, e.title)}
+                        title="Move to Trash"
+                        className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="pt-2 border-t border-zinc-900/60 flex justify-between text-[10px] text-zinc-400">
+                      <span>
+                        Seats: <strong className={remaining > 0 ? "text-emerald-400" : "text-amber-500"}>{remaining}</strong> / {initialCap}
+                      </span>
+                      <span>
+                        Waitlist: <strong className="text-amber-400">{waitlistedUids.length}</strong>
+                      </span>
+                    </div>
+
+                    {waitlistedUids.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-zinc-900/40 space-y-1 bg-zinc-950/20 p-2 rounded-lg">
+                        <span className="text-[9px] font-bold text-amber-500 uppercase tracking-wider block">Waitlist Queue:</span>
+                        <ol className="list-decimal list-inside space-y-0.5 text-[9px] text-zinc-400">
+                          {waitlistedUids.map((uid, idx) => {
+                            const name = mockDb.getUserById(uid)?.name || "Unknown";
+                            return (
+                              <li key={uid} className="truncate">
+                                <span className="text-zinc-300 font-medium">{name}</span>
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1 text-zinc-500 mt-0.5">
-                    <MapPin className="h-3 w-3" />
-                    <span className="truncate">{e.location}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1302,6 +1486,12 @@ export default function AdminControlCenter() {
                     <span className="text-[8px] text-zinc-400 font-light mt-0.5 block">
                       {img.category} ({img.type})
                     </span>
+                    <button
+                      onClick={() => handleDeleteGalleryItem(img.id, img.title)}
+                      className="mt-1.5 self-start flex items-center gap-1 px-2 py-1 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-[9px] font-bold hover:bg-red-500/30 transition-all"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" /> Remove
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1591,9 +1781,18 @@ export default function AdminControlCenter() {
                               Scan Stub
                             </button>
                           ) : (
-                            <span className="text-[10px] text-emerald-500/80 font-mono">
-                              {new Date(reg.checkedInAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-[10px] text-emerald-500/80 font-mono">
+                                {new Date(reg.checkedInAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              <button
+                                onClick={() => handleUndoCheckIn(reg.id, reg.userName)}
+                                title="Undo check-in"
+                                className="p-1 rounded-lg text-zinc-600 hover:text-amber-400 hover:bg-amber-500/10 transition-all"
+                              >
+                                <Undo2 className="h-3 w-3" />
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -1687,6 +1886,149 @@ export default function AdminControlCenter() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: AUDIT LOG */}
+      {activeTab === 'audit' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white" style={{ fontFamily: "var(--font-outfit, 'Outfit')" }}>Admin Audit Log</h3>
+              <p className="text-[11px] text-zinc-500 mt-0.5">Every admin action recorded with timestamp — most recent first.</p>
+            </div>
+            <span className="text-xs text-zinc-500">{auditLog.length} entries</span>
+          </div>
+
+          {auditLog.length === 0 ? (
+            <div className="glass-card rounded-2xl p-10 text-center">
+              <ClipboardList className="h-8 w-8 text-zinc-700 mx-auto mb-3" />
+              <p className="text-zinc-600 text-sm">No actions recorded yet. Actions appear here as you manage the portal.</p>
+            </div>
+          ) : (
+            <div className="glass-card rounded-2xl overflow-hidden">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-zinc-900 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                    <th className="px-5 py-3">Action</th>
+                    <th className="px-5 py-3">Target</th>
+                    <th className="px-5 py-3">Admin</th>
+                    <th className="px-5 py-3">Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-900/50">
+                  {auditLog.map((entry) => (
+                    <tr key={entry.id} className="hover:bg-zinc-900/20">
+                      <td className="px-5 py-3">
+                        <span style={{
+                          color: auditColor[entry.action] ?? '#a1a1aa',
+                          fontWeight: 600,
+                        }}>
+                          {auditLabel[entry.action] ?? entry.action}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-zinc-300">{entry.target}</td>
+                      <td className="px-5 py-3 text-zinc-400">{entry.adminName}</td>
+                      <td className="px-5 py-3 text-zinc-500">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 8: TRASH / RESTORE */}
+      {activeTab === 'trash' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div>
+            <h3 className="text-sm font-bold text-white" style={{ fontFamily: "var(--font-outfit, 'Outfit')" }}>Trash — Restore Deleted Items</h3>
+            <p className="text-[11px] text-zinc-500 mt-0.5">Soft-deleted items are held here. Restore them at any time.</p>
+          </div>
+
+          {/* Deleted Users */}
+          <div className="glass-card rounded-2xl p-5 space-y-3">
+            <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+              <Users className="h-3.5 w-3.5 text-rose-400" /> Deleted Users ({trashedUsers.length})
+            </h4>
+            {trashedUsers.length === 0 ? (
+              <p className="text-zinc-600 text-xs italic">No deleted users.</p>
+            ) : (
+              <div className="space-y-2">
+                {trashedUsers.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-zinc-900/40 border border-zinc-900">
+                    <div className="min-w-0">
+                      <span className="text-sm font-semibold text-white truncate block">{t.data.name}</span>
+                      <span className="text-[11px] text-zinc-500">{t.data.email} · Deleted {new Date(t.deletedAt).toLocaleDateString()} by {t.deletedBy}</span>
+                    </div>
+                    <button
+                      onClick={() => handleRestoreUser(t.data.uid)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition-all shrink-0"
+                    >
+                      <RotateCcw className="h-3 w-3" /> Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Deleted Events */}
+          <div className="glass-card rounded-2xl p-5 space-y-3">
+            <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+              <CalendarPlus className="h-3.5 w-3.5 text-orange-400" /> Deleted Events ({trashedEvents.length})
+            </h4>
+            {trashedEvents.length === 0 ? (
+              <p className="text-zinc-600 text-xs italic">No deleted events.</p>
+            ) : (
+              <div className="space-y-2">
+                {trashedEvents.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-zinc-900/40 border border-zinc-900">
+                    <div className="min-w-0">
+                      <span className="text-sm font-semibold text-white truncate block">{t.data.title}</span>
+                      <span className="text-[11px] text-zinc-500">{t.data.location} · Deleted {new Date(t.deletedAt).toLocaleDateString()} by {t.deletedBy}</span>
+                    </div>
+                    <button
+                      onClick={() => handleRestoreEvent(t.data.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition-all shrink-0"
+                    >
+                      <RotateCcw className="h-3 w-3" /> Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Deleted Gallery */}
+          <div className="glass-card rounded-2xl p-5 space-y-3">
+            <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+              <ImageIcon className="h-3.5 w-3.5 text-violet-400" /> Deleted Gallery Items ({trashedGallery.length})
+            </h4>
+            {trashedGallery.length === 0 ? (
+              <p className="text-zinc-600 text-xs italic">No deleted gallery items.</p>
+            ) : (
+              <div className="space-y-2">
+                {trashedGallery.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-zinc-900/40 border border-zinc-900">
+                    <div className="min-w-0">
+                      <span className="text-sm font-semibold text-white truncate block">{t.data.title}</span>
+                      <span className="text-[11px] text-zinc-500">{t.data.category} · {t.data.type} · Deleted {new Date(t.deletedAt).toLocaleDateString()} by {t.deletedBy}</span>
+                    </div>
+                    <button
+                      onClick={() => handleRestoreGalleryItem(t.data.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition-all shrink-0"
+                    >
+                      <RotateCcw className="h-3 w-3" /> Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

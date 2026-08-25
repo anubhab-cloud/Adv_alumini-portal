@@ -14,7 +14,9 @@ import {
   Calendar, 
   Tag, 
   Compass, 
-  Grid
+  Grid,
+  Upload,
+  Loader2
 } from "lucide-react";
 
 export default function GalleryPage() {
@@ -30,6 +32,16 @@ export default function GalleryPage() {
   // Lightbox State
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
+  // Upload Modal State
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadType, setUploadType] = useState<'photo' | 'video'>('photo');
+  const [uploadCategory, setUploadCategory] = useState<'2026 Reunion' | 'Sports' | 'Cultural' | 'Batch Photos'>('2026 Reunion');
+  const [uploadBatch, setUploadBatch] = useState<string>("All");
+  const [uploadFilePreview, setUploadFilePreview] = useState<string | null>(null);
+  const [useSampleVideo, setUseSampleVideo] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
   const albums = ["All", "2026 Reunion", "Sports", "Cultural", "Batch Photos"];
   const batches = ["All", "2020", "2021", "2022"];
 
@@ -39,6 +51,60 @@ export default function GalleryPage() {
 
   const refreshGallery = () => {
     setMedia(mockDb.getGalleryImages());
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadFilePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    let finalUrl = uploadFilePreview;
+    if (uploadType === 'video' && useSampleVideo) {
+      finalUrl = "https://assets.mixkit.co/videos/preview/mixkit-group-of-friends-raising-toast-at-dinner-party-40243-large.mp4";
+    }
+
+    if (!finalUrl || !uploadTitle) {
+      alert("Please choose a file or select the sample video option.");
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      mockDb.uploadGalleryImage(
+        finalUrl,
+        uploadTitle,
+        uploadType,
+        uploadCategory,
+        uploadBatch,
+        undefined, // no eventId
+        user.name,
+        user.uid
+      );
+
+      // Reset Form & Close
+      setUploadTitle("");
+      setUploadFilePreview(null);
+      setUseSampleVideo(false);
+      setUploadModalOpen(false);
+
+      // Refresh media feed
+      refreshGallery();
+    } catch (err) {
+      console.error("Failed to upload gallery media", err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // Reset pagination count on filter change
@@ -99,6 +165,13 @@ export default function GalleryPage() {
             Relive memories from reunions, cultural meets, sports competitions, and batch milestones.
           </p>
         </div>
+        <button
+          onClick={() => setUploadModalOpen(true)}
+          className="flex items-center justify-center gap-2 bg-primary hover:bg-violet-750 text-white font-semibold text-xs px-5 py-3 rounded-xl transition-all shadow-lg hover:shadow-violet-500/10 w-fit shrink-0"
+        >
+          <Camera className="h-4 w-4" />
+          Share Photo/Video
+        </button>
       </div>
 
       {/* Filter Control Panels */}
@@ -342,6 +415,171 @@ export default function GalleryPage() {
             >
               Next <ChevronRight className="h-4 w-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* CROWDSOURCED GALLERY UPLOADER MODAL */}
+      {uploadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 animate-in fade-in duration-200">
+          <div onClick={() => setUploadModalOpen(false)} className="absolute inset-0 bg-zinc-950/80 backdrop-blur-md" />
+          <div className="glass-card rounded-3xl p-6 md:p-8 max-w-lg w-full z-10 border border-zinc-800 shadow-2xl relative animate-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setUploadModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h2 className="text-xl font-bold font-outfit text-white mb-1">Share Photo / Video</h2>
+            <p className="text-zinc-400 text-xs font-light mb-6">
+              Publish media directly into the official gallery. It will be viewable by all portal members.
+            </p>
+
+            <form onSubmit={handleUploadSubmit} className="space-y-4 text-left">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block">
+                  Caption / Title
+                </label>
+                <input
+                  type="text"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  placeholder="e.g. Backstage at cultural night, 2026"
+                  className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-white"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block">
+                    Media Format
+                  </label>
+                  <select
+                    value={uploadType}
+                    onChange={(e) => {
+                      setUploadType(e.target.value as any);
+                      setUploadFilePreview(null);
+                    }}
+                    className="w-full glass-input rounded-xl px-3 py-2.5 text-xs text-white bg-zinc-900"
+                  >
+                    <option value="photo" className="bg-zinc-950">Photo</option>
+                    <option value="video" className="bg-zinc-950">Video snippet</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block">
+                    Target Batch Year
+                  </label>
+                  <select
+                    value={uploadBatch}
+                    onChange={(e) => setUploadBatch(e.target.value)}
+                    className="w-full glass-input rounded-xl px-3 py-2.5 text-xs text-white bg-zinc-900"
+                  >
+                    <option value="All" className="bg-zinc-950">All Batches</option>
+                    <option value="2020" className="bg-zinc-950">Class of 2020</option>
+                    <option value="2021" className="bg-zinc-950">Class of 2021</option>
+                    <option value="2022" className="bg-zinc-950">Class of 2022</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block">
+                  Category Folder
+                </label>
+                <select
+                  value={uploadCategory}
+                  onChange={(e) => setUploadCategory(e.target.value as any)}
+                  className="w-full glass-input rounded-xl px-3 py-2.5 text-xs text-white bg-zinc-900"
+                >
+                  <option value="2026 Reunion" className="bg-zinc-950">2026 Reunion</option>
+                  <option value="Sports" className="bg-zinc-950">Sports</option>
+                  <option value="Cultural" className="bg-zinc-950">Cultural</option>
+                  <option value="Batch Photos" className="bg-zinc-950">Batch Photos</option>
+                </select>
+              </div>
+
+              {/* Special options for Video */}
+              {uploadType === 'video' && (
+                <div className="flex items-center gap-2 bg-zinc-950/40 p-2.5 rounded-xl border border-zinc-900">
+                  <input
+                    type="checkbox"
+                    id="uploadVideoCheckbox"
+                    checked={useSampleVideo}
+                    onChange={(e) => setUseSampleVideo(e.target.checked)}
+                    className="rounded text-primary focus:ring-primary border-zinc-800"
+                  />
+                  <label htmlFor="uploadVideoCheckbox" className="text-[10px] text-zinc-450 cursor-pointer">
+                    Use Mixkit Toast Video stream template
+                  </label>
+                </div>
+              )}
+
+              {/* Media File Picker */}
+              {!(uploadType === 'video' && useSampleVideo) && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block">
+                    Choose Photo/Video File
+                  </label>
+                  <div className="relative border-2 border-dashed border-zinc-850 hover:border-zinc-800 rounded-xl p-5 flex flex-col items-center justify-center bg-zinc-950/20 cursor-pointer">
+                    {uploadFilePreview ? (
+                      <div className="w-full relative">
+                        {uploadType === "photo" ? (
+                          <img
+                            src={uploadFilePreview}
+                            alt="Preview"
+                            className="h-32 w-full object-cover rounded-lg border border-zinc-800"
+                          />
+                        ) : (
+                          <video
+                            src={uploadFilePreview}
+                            controls
+                            className="h-32 w-full object-cover rounded-lg border border-zinc-800"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setUploadFilePreview(null)}
+                          className="absolute top-2 right-2 bg-zinc-950/80 p-1 rounded-full text-zinc-300 hover:text-white"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="h-8 w-8 text-zinc-650 mb-2 animate-pulse" />
+                        <span className="text-[10px] text-zinc-450 font-light">Drag & drop or Click to choose file</span>
+                        <input
+                          type="file"
+                          accept={uploadType === 'photo' ? 'image/*' : 'video/*'}
+                          onChange={handleFileChange}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          required
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isUploading || (!uploadFilePreview && !(uploadType === 'video' && useSampleVideo))}
+                className="w-full bg-primary hover:bg-violet-750 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg"
+              >
+                {isUploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    <span>Publish to Gallery</span>
+                  </>
+                )}
+              </button>
+            </form>
           </div>
         </div>
       )}
